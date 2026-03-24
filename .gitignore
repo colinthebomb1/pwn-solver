@@ -1,0 +1,30 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+.env
+.venv/
+venv/
+
+exploits/
+logs/
+
+*.o
+*.elf
+tests/challenges/ret2win_x64
+
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Ghidra project files
+*.gpr
+*.rep/
+
+# IDE
+.vscode/
+.idea/

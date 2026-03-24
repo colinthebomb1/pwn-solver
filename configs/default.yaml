@@ -1,0 +1,22 @@
+model:
+  name: claude-sonnet-4-20250514
+  max_tokens: 4096
+  temperature: 0.0
+
+agent:
+  max_iterations: 30
+  timeout_seconds: 300
+
+ghidra:
+  home: /opt/ghidra
+  max_ram: 2G
+  cache_dir: ~/.cache/pwn-solver/ghidra
+
+qdrant:
+  url: http://localhost:6333
+  collection: pwn-knowledge
+
+retrieval:
+  top_k: 20
+  rerank_top_k: 5
+  embedding_model: voyage-3-large
