@@ -31,6 +31,30 @@ If it fails, analyze the error output, adjust offsets or approach, and retry.
 - When writing exploits, use pwntools idioms (ELF(), ROP(), p64(), etc.).
 - If an exploit fails, analyze WHY before retrying with changes.
 - Limit exploit attempts to 5 retries with meaningful changes between each.
+
+## Success Criteria
+
+Your exploit is NOT successful until you see the actual flag or shell output in stdout. \
+A SIGSEGV crash means the binary crashed — that's a FAILURE, not success. \
+The `run_exploit` tool returns `script_ran_ok` which only means the Python script \
+itself didn't error — it does NOT mean the exploit worked.
+
+You MUST keep iterating until:
+- You see a flag string (e.g. "FLAG{...}") in the exploit output, OR
+- You get an interactive shell, OR
+- You've exhausted your retry budget.
+
+A typical ret2win exploit must: (1) find the buffer overflow offset, (2) overwrite the \
+return address with the win function address, and (3) confirm the flag appears in output.
+
+## Exploit Script Guidelines
+
+Write self-contained pwntools scripts. Always:
+- Use `context.log_level = 'info'` so pwntools output is captured.
+- Print the flag or key output explicitly with `print()`.
+- Handle the case where the process crashes (catch and print the crash info).
+- For x86_64: remember stack alignment — if a call to system/puts/etc segfaults, \
+add a `ret` gadget before the function address to align the stack to 16 bytes.
 """
 
 

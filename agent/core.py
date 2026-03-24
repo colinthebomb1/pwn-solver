@@ -218,10 +218,19 @@ class PwnAgent:
                 for block in assistant_content:
                     if block.type == "text":
                         summary += block.text
+
+                # Extract the last exploit script if any
+                last_script = None
+                for tc in reversed(all_tool_calls):
+                    if tc["tool"] == "run_exploit":
+                        last_script = tc["input"].get("script")
+                        break
+
                 return AgentResult(
                     success=True,
                     summary=summary,
                     iterations=iteration,
+                    exploit_script=last_script,
                     tool_calls=all_tool_calls,
                 )
 
@@ -254,18 +263,6 @@ class PwnAgent:
 
                     # Display result
                     self._display_tool_result(tool_name, result, elapsed)
-
-                    # Check if this is a successful exploit
-                    if tool_name == "run_exploit" and isinstance(result, dict) and result.get("success"):
-                        script = tool_input.get("script", "")
-                        console.print("[bold green]Exploit succeeded![/bold green]")
-                        return AgentResult(
-                            success=True,
-                            summary="Exploit executed successfully.",
-                            iterations=iteration,
-                            exploit_script=script,
-                            tool_calls=all_tool_calls,
-                        )
 
                     result_str = json.dumps(result, indent=2, default=str)
                     if len(result_str) > 8000:

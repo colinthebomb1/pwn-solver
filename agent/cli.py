@@ -35,9 +35,17 @@ def main(binary: str, remote: str | None, model: str, max_iterations: int) -> No
     if result.success:
         console.print("[bold green]✓ Solve complete[/bold green]")
         if result.exploit_script:
-            console.print("\n[bold]Final exploit script:[/bold]")
-            from rich.syntax import Syntax
+            # Save final exploit to a predictable path
+            binary_name = os.path.splitext(os.path.basename(binary))[0]
+            exploits_dir = os.path.join(os.path.dirname(__file__), "..", "exploits")
+            os.makedirs(exploits_dir, exist_ok=True)
+            final_path = os.path.join(exploits_dir, f"solve_{binary_name}.py")
+            with open(final_path, "w") as f:
+                f.write(result.exploit_script)
 
+            console.print(f"\n[bold]Final exploit saved to:[/bold] {os.path.abspath(final_path)}")
+            console.print()
+            from rich.syntax import Syntax
             console.print(Syntax(result.exploit_script, "python", theme="monokai"))
     else:
         console.print("[bold red]✗ Solve failed[/bold red]")
