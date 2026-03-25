@@ -16,7 +16,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from agent.planner import plan_from_checksec
-from agent.prompts import SYSTEM_PROMPT
+from agent.prompts import get_system_prompt
 
 console = Console()
 
@@ -185,19 +185,36 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         },
     },
     "format_string_payload": {
-        "description": "Generate a format string write payload using pwntools fmtstr_payload. Writes arbitrary values to arbitrary addresses via %n.",
+        "description": (
+            "Generate a format string write payload (pwntools fmtstr_payload). "
+            "In run_exploit scripts, copy exploit_lines verbatim OR use bytes.fromhex(payload_hex) — "
+            "never type binary as b'\\\\xdc3@' or change %7$ to %8$."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "offset": {
                     "type": "integer",
-                    "description": "Format string parameter offset (position of your buffer on the stack). Find by sending %p payloads.",
+                    "description": "Stack index where your input starts (from AAAA%p.%p... tests).",
                 },
                 "writes": {
                     "type": "object",
-                    "description": "Dict of {hex_address: value} to write. Example: {'0x404060': 1}.",
+                    "description": "Dict of {hex_address: value}. Example: {'0x4033dc': 1} for a flag byte.",
                 },
-                "arch": {"type": "string", "description": "Target architecture. Default 'amd64'."},
+                "arch": {"type": "string", "description": "Default 'amd64'."},
+                "written": {
+                    "type": "integer",
+                    "description": "Chars already printed in THIS printf only. Usually 0 if prefix was a separate printf(3) call.",
+                },
+                "write_size": {
+                    "type": "string",
+                    "enum": ["byte", "short", "int"],
+                    "description": "Prefer 'byte' for small writes (default). Use 'int' for full 32-bit values.",
+                },
+                "no_dollars": {
+                    "type": "boolean",
+                    "description": "Set true if the binary rejects positional %N$ (pwntools no_dollars). Default false.",
+                },
             },
             "required": ["offset", "writes"],
         },
@@ -356,7 +373,7 @@ class PwnAgent:
             for name, spec in TOOL_REGISTRY.items()
         ]
 
-        system = SYSTEM_PROMPT
+        system = get_system_prompt()
         if remote:
             host, port = remote.split(":")
             system += f"\n\nRemote target: {host}:{port}"
