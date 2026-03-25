@@ -103,6 +103,16 @@ def gdb_find_offset(binary_path: str, pattern_length: int = 300) -> dict:
     sig_match = re.search(r"Program received signal (\w+)", output)
     if sig_match:
         signal_info = sig_match.group(1)
+    else:
+        # Fallbacks for different GDB/pwndbg output shapes.
+        sig_match = re.search(r"\b(SIG[A-Z]+)\b", output)
+        if sig_match:
+            signal_info = sig_match.group(1)
+        else:
+            prog = session.command("info program")
+            sig_match = re.search(r"\b(SIG[A-Z]+)\b", prog)
+            if sig_match:
+                signal_info = sig_match.group(1)
 
     # Read registers after crash
     reg_output = session.command("info registers rip rsp rbp")

@@ -300,20 +300,21 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         },
     },
     "run_exploit": {
-        "description": "Execute a pwntools exploit script. Write a complete Python script using pwntools, and this tool will run it and return stdout/stderr/exit_code.",
+        "description": "Execute a pwntools exploit script. Write a complete Python script using pwntools, and this tool will run it and return stdout/stderr/exit_code. Scripts are not persisted unless save_script=true.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "script": {"type": "string", "description": "The pwntools exploit script as a Python string."},
                 "binary_path": {"type": "string", "description": "Path to target binary (optional, set as BINARY env var)."},
                 "timeout": {"type": "integer", "description": "Execution timeout in seconds. Default 15."},
+                "save_script": {"type": "boolean", "description": "Set true to save the script under /exploits. Default false."},
             },
             "required": ["script"],
         },
     },
     # --- Dynamic analysis (GDB) tools ---
     "gdb_find_offset": {
-        "description": "Find the exact buffer overflow offset by crashing the binary with a cyclic pattern in GDB and analyzing the crash state. Much more reliable than guessing offsets.",
+        "description": "Find the exact buffer overflow offset by crashing the binary with a cyclic pattern in GDB and analyzing the crash state. Much more reliable than guessing offsets; on canary binaries this may abort at __stack_chk_fail before RIP control.",
         "input_schema": {
             "type": "object",
             "properties": {
