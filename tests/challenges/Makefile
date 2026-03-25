@@ -2,7 +2,8 @@ CC = gcc
 
 CFLAGS_RET2WIN    = -fno-stack-protector -no-pie -z execstack -z norelro
 CFLAGS_RET2LIBC   = -fno-stack-protector -no-pie -z relro
-CFLAGS_SHELLCODE  = -fno-stack-protector -no-pie -z execstack -z norelro
+CFLAGS_SHELLCODE  = -fno-stack-protector -no-pie -z execstack -z norelro \
+                    -DLEVELNAME='"stack-five-local"'
 CFLAGS_FMTREAD    = -fno-stack-protector -no-pie -z norelro -Wno-format-security
 CFLAGS_FMTWRITE   = -fno-stack-protector -no-pie -z norelro -Wno-format-security
 
