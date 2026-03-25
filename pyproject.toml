@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
-build-backend = "setuptools.backends._legacy:_Backend"
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "pwn-solver"
@@ -41,7 +41,8 @@ dev = [
 pwn-solver = "agent.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["agent*", "mcp_servers*", "knowledge*"]
+where = ["."]
+include = ["agent*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
