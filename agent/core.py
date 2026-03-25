@@ -66,6 +66,10 @@ TOOL_MODULE_MAP: dict[str, str] = {
     "cyclic_pattern": "exploit",
     "strings_search": "exploit",
     "shellcraft_generate": "exploit",
+    "libc_symbols": "exploit",
+    "libc_base_from_leak": "exploit",
+    "ret2libc_stage1_payload": "exploit",
+    "ret2libc_stage2_payload": "exploit",
     "format_string_payload": "exploit",
     "run_exploit": "exploit",
     "gdb_find_offset": "dynamic",
@@ -182,6 +186,60 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
                 },
             },
             "required": ["payload_type"],
+        },
+    },
+    "libc_symbols": {
+        "description": "Resolve useful libc symbol offsets and /bin/sh offset from a libc .so file.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "libc_path": {"type": "string", "description": "Path to libc shared object."},
+                "symbols": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional symbol names. Defaults to puts/system/__libc_start_main.",
+                },
+            },
+            "required": ["libc_path"],
+        },
+    },
+    "libc_base_from_leak": {
+        "description": "Compute libc base from one leaked symbol address and return resolved runtime addresses (system, /bin/sh).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "libc_path": {"type": "string", "description": "Path to libc shared object."},
+                "leaked_symbol": {"type": "string", "description": "Leaked symbol name, e.g. puts."},
+                "leaked_address": {"type": "string", "description": "Leaked runtime address as hex/int string."},
+            },
+            "required": ["libc_path", "leaked_symbol", "leaked_address"],
+        },
+    },
+    "ret2libc_stage1_payload": {
+        "description": "Build stage-1 payload: leak GOT via puts@plt and return to main/vuln for a second stage.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "binary_path": {"type": "string", "description": "Target ELF path."},
+                "offset": {"type": "integer", "description": "Overflow offset to saved RIP."},
+                "leak_symbol": {"type": "string", "description": "Imported symbol to leak. Default puts."},
+                "reentry_symbol": {"type": "string", "description": "Symbol to return to after leak. Default main."},
+            },
+            "required": ["binary_path", "offset"],
+        },
+    },
+    "ret2libc_stage2_payload": {
+        "description": "Build stage-2 payload: compute libc base from leak and call system('/bin/sh').",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "binary_path": {"type": "string", "description": "Target ELF path."},
+                "libc_path": {"type": "string", "description": "Libc path used by target."},
+                "offset": {"type": "integer", "description": "Overflow offset to saved RIP."},
+                "leaked_symbol": {"type": "string", "description": "Symbol name used for base calc (e.g. puts)."},
+                "leaked_address": {"type": "string", "description": "Leaked runtime address as hex/int string."},
+            },
+            "required": ["binary_path", "libc_path", "offset", "leaked_symbol", "leaked_address"],
         },
     },
     "format_string_payload": {
