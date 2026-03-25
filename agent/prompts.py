@@ -44,13 +44,20 @@ return address with the win function's address.
 No win function, but `system()` is in PLT or libc. Build a ROP chain to call \
 `system("/bin/sh")`.
 1. `checksec` → confirm no canary, no PIE, NX enabled
-2. `elf_symbols` → look for `system` in PLT and `/bin/sh` string in binary
-3. `elf_search` with search_string="/bin/sh" → get the exact virtual address of the string
-4. `rop_gadgets` → find `pop rdi; ret` gadget (needed to set first argument on x86_64)
-5. `gdb_find_offset` → get exact offset
-6. Build ROP chain: `padding + pop_rdi + binsh_addr + ret_gadget + system_addr`
-   - The extra `ret` before `system` ensures 16-byte stack alignment on x86_64
-   - Use the address from `elf_search`, NOT the symbol address (which is a pointer)
+2. `gdb_find_offset` → exact RIP offset.
+3. If binary has no `system@plt` or `/bin/sh` in `.rodata`, do a **2-stage leak**:
+   - Stage 1: use `ret2libc_stage1_payload` to leak `puts@got` via `puts@plt`, then return to `main`.
+   - Parse leaked pointer from output bytes between stable markers (often after `bye\\n` and before next prompt).
+   - Do NOT assume first post-payload line is the leak; there may be blank/newline noise.
+4. Resolve libc with tools:
+   - `libc_symbols` to check offsets / availability.
+   - `libc_base_from_leak` using leaked symbol + leaked addr.
+5. Stage 2:
+   - `ret2libc_stage2_payload` to call `system("/bin/sh")` with computed libc base.
+   - Keep a `ret` for stack alignment on amd64 before `system`.
+6. Validate shell robustly (`id` -> `uid=`), not just process non-crash.
+   - Send `id` then collect with `recvrepeat(timeout)` (or multiple recv attempts), because first read can be `b'\\n'` or banner text.
+   - Treat `uid=` anywhere in collected bytes as success.
 
 ### Shellcode injection (e.g. Phoenix stack-five class)
 NX is disabled, so the stack is executable. The test binary is **Phoenix stack-five**-style \
@@ -161,14 +168,15 @@ add a `ret` gadget before the function address to align the stack to 16 bytes.
 **Shell exploit script structure** — when the exploit spawns a shell, use this pattern:
 ```
 # ... build and send payload ...
-# Validate shell access
+# Validate shell access (robustly; first recv may be just a newline/banner)
 p.sendline(b'id')
-response = p.recvline(timeout=3)
+response = p.recvrepeat(1.5)
 if b'uid=' in response:
     print('[+] GOT SHELL')
-    print(response.decode())
+    print(response.decode(errors='replace'))
 else:
     print('[-] No shell obtained')
+    print(response)
     p.close()
     exit(1)
 # Drop into interactive shell (for the user; will auto-exit under run_exploit)
