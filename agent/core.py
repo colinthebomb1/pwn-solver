@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import time
+import random
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -468,13 +469,32 @@ class PwnAgent:
         for iteration in range(1, self.max_iterations + 1):
             console.print(f"\n[dim]─── Iteration {iteration}/{self.max_iterations} ───[/dim]")
 
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                system=system,
-                tools=tools,
-                messages=messages,
-            )
+            # Anthropic sometimes returns 429/529 transient errors. Retry so the
+            # agent doesn't crash mid-run and lose context.
+            last_exc: Exception | None = None
+            for attempt in range(1, 6):
+                try:
+                    response = self.client.messages.create(
+                        model=self.model,
+                        max_tokens=4096,
+                        system=system,
+                        tools=tools,
+                        messages=messages,
+                    )
+                    last_exc = None
+                    break
+                except (anthropic._exceptions.OverloadedError, anthropic._exceptions.RateLimitError) as e:
+                    last_exc = e
+                    if attempt >= 5:
+                        break
+                    # Exponential backoff with small jitter.
+                    sleep_s = min(2 ** attempt, 20) + random.uniform(0, 0.75)
+                    console.print(
+                        f"[dim]Anthropic busy (attempt {attempt}/4). Sleeping {sleep_s:.1f}s...[/dim]"
+                    )
+                    time.sleep(sleep_s)
+            if last_exc is not None:
+                raise last_exc
 
             assistant_content = response.content
             tool_use_blocks = []
