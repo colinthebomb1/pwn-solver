@@ -7,7 +7,12 @@ import os
 
 import pexpect
 
-ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b\([a-zA-Z]")
+# CSI sequences, including bracketed paste (\\e[?2004h / \\e[?2004l) and SGR.
+ANSI_ESCAPE = re.compile(
+    r"\x1b\[\?[0-9;]*[a-zA-Z]"
+    r"|\x1b\[[0-9;]*[a-zA-Z]"
+    r"|\x1b\([a-zA-Z]"
+)
 PROMPT_PATTERN = [r"pwndbg>", r"\(gdb\)"]
 PROMPT_RE = re.compile(r"(?:pwndbg>|\(gdb\))\s*$")
 
@@ -25,17 +30,27 @@ _GDB_INIT_COMMANDS = (
 )
 
 
+_GDB_SKIP_SUBSTRINGS = (
+    "Thread debugging using libthread_db",
+    "Using host libthread_db",
+)
+
+
 def compact_gdb_transcript(text: str, max_chars: int = 2000) -> str:
     """Strip decorative Unicode, whitespace, and cap length for tool responses."""
     if not text:
         return text
     text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = ANSI_ESCAPE.sub("", text)
     text = _MESSY_UNICODE_RE.sub(" ", text)
     lines_out: list[str] = []
     for line in text.split("\n"):
         cleaned = re.sub(r"  +", " ", line).strip()
-        if cleaned:
-            lines_out.append(cleaned)
+        if not cleaned:
+            continue
+        if any(s in cleaned for s in _GDB_SKIP_SUBSTRINGS):
+            continue
+        lines_out.append(cleaned)
     text = "\n".join(lines_out)
     if len(text) > max_chars:
         drop = len(text) - max_chars
