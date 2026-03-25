@@ -70,6 +70,15 @@ def plan_from_checksec(checksec_result: dict) -> Strategy:
             technique_hints=techniques,
         )
 
+    if canary and pie and nx:
+        techniques.extend(["canary_leak", "ret2libc", "pie_base_leak"])
+        return Strategy(
+            name="canary_pie_ret2libc",
+            description="PIE + NX + stack canary — leak canary and PIE base, then perform staged ret2libc with canary-aware payloads.",
+            suggested_tools=tools + ["rop_gadgets", "pie_base_from_leak", "libc_symbols", "libc_base_from_leak"],
+            technique_hints=techniques,
+        )
+
     if canary:
         techniques.append("canary_leak")
         techniques.append("format_string")

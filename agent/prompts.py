@@ -128,6 +128,8 @@ When you need **`libc.address`** but have overflow + symbols:
 If a read/print echoes your input past the buffer until NUL: fill with non-null bytes up to \
 the canary, leak **up to and including** the first canary byte; often reconstruct with **`u64`** \
 (**low byte of canary is often 0x00** on amd64 — see knowledge base).
+When building ret2libc payloads after a canary leak, use `ret2libc_stage1_payload` / \
+`ret2libc_stage2_payload` with `canary=<hex>`, `canary_offset=<int>`, and optional `saved_rbp`.
 
 ### GDB / dynamic analysis
 Use **`gdb_run`**, **`gdb_breakpoint`**, **`gdb_stack`**, **`gdb_vmmap`**, **`gdb_examine`** \

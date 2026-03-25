@@ -46,6 +46,15 @@ class TestPlanFromChecksec:
         assert result.name == "canary_bypass"
         assert "canary_leak" in result.technique_hints
 
+    def test_canary_pie_nx(self):
+        result = plan_from_checksec({
+            "canary": True, "nx": True, "pie": True,
+            "relro": "Full", "bits": 64,
+        })
+        assert result.name == "canary_pie_ret2libc"
+        assert "canary_leak" in result.technique_hints
+        assert "ret2libc" in result.technique_hints
+
     def test_suggested_tools_always_present(self):
         for checksec in [
             {"canary": False, "nx": False, "pie": False, "relro": "No RELRO", "bits": 64},
