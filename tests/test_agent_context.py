@@ -7,7 +7,9 @@ import json
 import pytest
 
 
-def test_trim_conversation_keeps_bootstrap_and_recent_turns(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_trim_conversation_keeps_bootstrap_and_recent_turns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from agent.core import _trim_conversation
 
     monkeypatch.setenv("PWN_AGENT_CONTEXT_TURNS", "3")
@@ -27,7 +29,9 @@ def test_trim_conversation_keeps_bootstrap_and_recent_turns(monkeypatch: pytest.
     assert messages[-1]["content"] == "u7"
 
 
-def test_run_exploit_result_truncates_script_in_api_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_exploit_result_truncates_script_in_api_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from agent.core import _tool_result_str_for_api
 
     monkeypatch.setenv("PWN_AGENT_RUN_EXPLOIT_SCRIPT_SNIP", "20")

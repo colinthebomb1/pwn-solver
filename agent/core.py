@@ -14,7 +14,6 @@ from typing import Any
 import anthropic
 from rich.console import Console
 from rich.panel import Panel
-from rich.syntax import Syntax
 from rich.table import Table
 
 from agent.planner import plan_from_checksec
@@ -84,7 +83,11 @@ def _shallow_copy_trunc_run_exploit_script(result: Any) -> Any:
 
 
 def _tool_result_str_for_api(tool_name: str, result: Any, suffix: str = "") -> str:
-    payload = _shallow_copy_trunc_run_exploit_script(result) if tool_name == "run_exploit" else result
+    payload = (
+        _shallow_copy_trunc_run_exploit_script(result)
+        if tool_name == "run_exploit"
+        else result
+    )
     body = json.dumps(payload, separators=(",", ":"), default=str) + suffix
     cap = _env_int("PWN_AGENT_TOOL_RESULT_MAX", 4500)
     if len(body) > cap:
@@ -141,7 +144,9 @@ def _get_exploit_module():
 def _get_dynamic_module():
     global _dynamic_mod
     if _dynamic_mod is None:
-        server_dir = os.path.join(os.path.dirname(__file__), "..", "mcp-servers", "dynamic-analysis")
+        server_dir = os.path.join(
+            os.path.dirname(__file__), "..", "mcp-servers", "dynamic-analysis"
+        )
         _dynamic_mod = _load_server_module("dynamic_server", server_dir)
     return _dynamic_mod
 
@@ -189,16 +194,26 @@ class PwnAgent:
         api_key: str | None = None,
     ):
         self.model = model
-        self.max_iterations = max_iterations if max_iterations is not None else _default_max_iterations()
+        self.max_iterations = (
+            max_iterations if max_iterations is not None else _default_max_iterations()
+        )
         self.client = anthropic.Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
 
     def solve(self, binary_path: str, remote: str | None = None) -> AgentResult:
         """Run the full ReAct loop to analyze and exploit a binary."""
         binary_path = os.path.abspath(binary_path)
         if not os.path.isfile(binary_path):
-            return AgentResult(success=False, summary=f"Binary not found: {binary_path}", iterations=0)
+            return AgentResult(
+                success=False, summary=f"Binary not found: {binary_path}", iterations=0
+            )
 
-        console.print(Panel(f"[bold]Target:[/bold] {binary_path}", title="pwn-solver", border_style="blue"))
+        console.print(
+            Panel(
+                f"[bold]Target:[/bold] {binary_path}",
+                title="pwn-solver",
+                border_style="blue",
+            )
+        )
 
         tools = [
             {"name": name, "description": spec["description"], "input_schema": spec["input_schema"]}
@@ -223,10 +238,14 @@ class PwnAgent:
                     return {"error": f"{type(e).__name__}: {e}"}
 
             checksec_res = _safe_call("checksec", {"binary_path": binary_path})
-            funcs_res = _safe_call("elf_symbols", {"binary_path": binary_path, "symbol_type": "functions"})
+            funcs_res = _safe_call(
+                "elf_symbols", {"binary_path": binary_path, "symbol_type": "functions"}
+            )
             plt_res = _safe_call("elf_symbols", {"binary_path": binary_path, "symbol_type": "plt"})
             got_res = _safe_call("elf_symbols", {"binary_path": binary_path, "symbol_type": "got"})
-            strings_res = _safe_call("strings_search", {"binary_path": binary_path, "min_length": 4})
+            strings_res = _safe_call(
+                "strings_search", {"binary_path": binary_path, "min_length": 4}
+            )
 
             plt = plt_res.get("plt", {}) if isinstance(plt_res, dict) else {}
             got = got_res.get("got", {}) if isinstance(got_res, dict) else {}
@@ -266,7 +285,8 @@ class PwnAgent:
                     "Typical vuln stack for this family: buffer low at rbp-0x50, canary at rbp-0x8 "
                     "→ 72 bytes fill to canary, 88 bytes to saved RIP (not 80 from sub rsp,0x50). "
                     "sub rsp,IMM is total frame size, not distance to canary. "
-                    "Use recvuntil(b'name?\\n'). Printed canary matches vuln fs:0x28 in one process; "
+                    "Use recvuntil(b'name?\\n'). Printed canary "
+                    "matches vuln fs:0x28 in one process; "
                     "do not compare unrelated GDB runs."
                 )
             # Keep the injected message short enough to avoid token blowups.
@@ -282,7 +302,8 @@ class PwnAgent:
                 "role": "user",
                 "content": (
                     f"Analyze and exploit the binary at `{binary_path}`. "
-                    f"Start with `checksec` + `elf_symbols` for recon, but if bootstrap provides those values, reuse them. "
+                    "Start with `checksec` + `elf_symbols` for recon, "
+                    "but if bootstrap provides those values, reuse them. "
                     f"Use gdb_find_offset to determine buffer overflow offsets precisely."
                 ),
             }
@@ -319,14 +340,18 @@ class PwnAgent:
                     )
                     last_exc = None
                     break
-                except (anthropic._exceptions.OverloadedError, anthropic._exceptions.RateLimitError) as e:
+                except (
+                    anthropic._exceptions.OverloadedError,
+                    anthropic._exceptions.RateLimitError,
+                ) as e:
                     last_exc = e
                     if attempt >= 5:
                         break
                     # Exponential backoff with small jitter.
                     sleep_s = min(2 ** attempt, 20) + random.uniform(0, 0.75)
                     console.print(
-                        f"[dim]Anthropic busy (attempt {attempt}/4). Sleeping {sleep_s:.1f}s...[/dim]"
+                        "[dim]Anthropic busy (attempt "
+                        f"{attempt}/4). Sleeping {sleep_s:.1f}s...[/dim]"
                     )
                     time.sleep(sleep_s)
             if last_exc is not None:
@@ -396,7 +421,11 @@ class PwnAgent:
                             )
 
                     suffix = ""
-                    if tool_name == "checksec" and not planner_injected and isinstance(result, dict):
+                    if (
+                        tool_name == "checksec"
+                        and not planner_injected
+                        and isinstance(result, dict)
+                    ):
                         strategy = plan_from_checksec(result)
                         suffix = (
                             "\n\n[Strategy Hint] Based on checksec: **"
@@ -450,7 +479,11 @@ class PwnAgent:
         console.print(table)
 
     def _display_tool_result(self, name: str, result: Any, elapsed: float) -> None:
-        result_str = json.dumps(result, indent=2, default=str) if not isinstance(result, str) else result
+        result_str = (
+            json.dumps(result, indent=2, default=str)
+            if not isinstance(result, str)
+            else result
+        )
         if len(result_str) > 2000:
             result_str = result_str[:2000] + "\n... [truncated]"
         console.print(

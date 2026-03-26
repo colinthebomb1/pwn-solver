@@ -88,7 +88,7 @@ def gdb_find_offset(binary_path: str, pattern_length: int = 300) -> dict:
 
     Returns dict with: offset, crash_address, register_state, signal.
     """
-    from pwn import cyclic, cyclic_find, context
+    from pwn import context, cyclic, cyclic_find
 
     context.arch = "amd64"
     path = _resolve_binary(binary_path)
@@ -121,7 +121,6 @@ def gdb_find_offset(binary_path: str, pattern_length: int = 300) -> dict:
     regs = _parse_registers(reg_output)
 
     rip_val = regs.get("rip", "")
-    rsp_val = regs.get("rsp", "")
     rbp_val = regs.get("rbp", "")
 
     offset = None
@@ -311,7 +310,8 @@ def gdb_examine(
         binary_path: Path to the ELF binary.
         address: Memory address to examine (hex or $register expression).
         count: Number of units to display. Defaults to 16.
-        format: GDB format string (e.g. "gx" for giant hex, "wx" for word hex, "s" for string). Defaults to "gx".
+        format: GDB format string (e.g. "gx" giant hex, "wx" word hex, "s" string).
+            Defaults to "gx".
         stdin_data: Optional stdin to provide before examining.
         break_at: Optional breakpoint to set before running (address or symbol).
 
