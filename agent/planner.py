@@ -19,7 +19,6 @@ def plan_from_checksec(checksec_result: dict) -> Strategy:
     nx = checksec_result.get("nx", False)
     pie = checksec_result.get("pie", False)
     relro = checksec_result.get("relro", "No RELRO")
-    bits = checksec_result.get("bits", 64)
 
     techniques: list[str] = []
     tools: list[str] = ["elf_symbols", "strings_search"]
@@ -42,8 +41,12 @@ def plan_from_checksec(checksec_result: dict) -> Strategy:
         return Strategy(
             name="rop",
             description=(
-                f"NX enabled, no canary, no PIE — use ROP. "
-                f"{'Full RELRO — GOT is read-only.' if full_relro else 'Partial RELRO — GOT overwrite possible.'}"
+                "NX enabled, no canary, no PIE — use ROP. "
+                + (
+                    "Full RELRO — GOT is read-only."
+                    if full_relro
+                    else "Partial RELRO — GOT overwrite possible."
+                )
             ),
             suggested_tools=tools + ["cyclic_pattern"],
             technique_hints=techniques,
@@ -57,8 +60,12 @@ def plan_from_checksec(checksec_result: dict) -> Strategy:
             techniques.extend(["ret2libc", "pie_base_leak"])
             return Strategy(
                 name="pie_ret2libc",
-                description="PIE enabled + NX — leak PIE base, then use staged ret2libc (libc leak -> system).",
-                suggested_tools=tools + ["rop_gadgets", "pie_base_from_leak", "libc_symbols", "libc_base_from_leak"],
+                description=(
+                    "PIE enabled + NX — leak PIE base, then use staged ret2libc "
+                    "(libc leak -> system)."
+                ),
+                suggested_tools=tools
+                + ["rop_gadgets", "pie_base_from_leak", "libc_symbols", "libc_base_from_leak"],
                 technique_hints=techniques,
             )
 
@@ -74,8 +81,12 @@ def plan_from_checksec(checksec_result: dict) -> Strategy:
         techniques.extend(["canary_leak", "ret2libc", "pie_base_leak"])
         return Strategy(
             name="canary_pie_ret2libc",
-            description="PIE + NX + stack canary — leak canary and PIE base, then perform staged ret2libc with canary-aware payloads.",
-            suggested_tools=tools + ["rop_gadgets", "pie_base_from_leak", "libc_symbols", "libc_base_from_leak"],
+            description=(
+                "PIE + NX + stack canary — leak canary and PIE base, then perform "
+                "staged ret2libc with canary-aware payloads."
+            ),
+            suggested_tools=tools
+            + ["rop_gadgets", "pie_base_from_leak", "libc_symbols", "libc_base_from_leak"],
             technique_hints=techniques,
         )
 
@@ -91,7 +102,10 @@ def plan_from_checksec(checksec_result: dict) -> Strategy:
 
     return Strategy(
         name="unknown",
-        description="Could not determine a clear strategy from checksec alone. Proceed with manual analysis.",
+        description=(
+            "Could not determine a clear strategy from checksec alone. "
+            "Proceed with manual analysis."
+        ),
         suggested_tools=tools + ["rop_gadgets"],
         technique_hints=["manual_analysis"],
     )
