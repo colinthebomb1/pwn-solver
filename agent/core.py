@@ -44,14 +44,13 @@ def _env_int(name: str, default: int) -> int:
 
 
 def _default_max_iterations() -> int:
-    """CLI default when `-n` omitted: env PWN_AGENT_MAX_ITERATIONS, then MAX_AGENT_ITERATIONS, else 30."""
-    for key in ("PWN_AGENT_MAX_ITERATIONS", "MAX_AGENT_ITERATIONS"):
-        raw = os.environ.get(key)
-        if raw and str(raw).strip():
-            try:
-                return int(raw)
-            except ValueError:
-                continue
+    """CLI default when `-n` omitted: env `PWN_AGENT_MAX_ITERATIONS`, else 30."""
+    raw = os.environ.get("PWN_AGENT_MAX_ITERATIONS")
+    if raw and str(raw).strip():
+        try:
+            return int(raw)
+        except ValueError:
+            pass
     return 30
 
 
