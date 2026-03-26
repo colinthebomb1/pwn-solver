@@ -29,7 +29,10 @@ def main(binary: str, remote: str | None, model: str, max_iterations: int | None
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        console.print("[bold red]Error:[/bold red] ANTHROPIC_API_KEY not set. Copy .env.example to .env and fill it in.")
+        console.print(
+            "[bold red]Error:[/bold red] ANTHROPIC_API_KEY not set. "
+            "Copy .env.example to .env and fill it in."
+        )
         sys.exit(1)
 
     from agent.core import PwnAgent
@@ -61,7 +64,10 @@ def main(binary: str, remote: str | None, model: str, max_iterations: int | None
         if os.path.isfile(last_path):
             console.print(f"[dim]Latest run_exploit script (if any): {last_path}[/dim]")
 
-    console.print(f"\n[dim]Iterations: {result.iterations} | Tool calls: {len(result.tool_calls)}[/dim]")
+    console.print(
+        f"\n[dim]Iterations: {result.iterations} | "
+        f"Tool calls: {len(result.tool_calls)}[/dim]"
+    )
 
 
 if __name__ == "__main__":

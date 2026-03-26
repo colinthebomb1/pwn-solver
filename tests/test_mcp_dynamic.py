@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from tests.mcp_loader import load_dynamic_analysis
 
 gdb_server = load_dynamic_analysis()
