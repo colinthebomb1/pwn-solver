@@ -190,7 +190,10 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         },
     },
     "shellcraft_generate": {
-        "description": "Generate shellcode using pwntools shellcraft. Returns hex-encoded shellcode, assembly listing, and length.",
+        "description": (
+            "Generate shellcode via pwntools shellcraft. Prefer exploit_lines (asm(shellcraft...)); "
+            "use exploit_lines_hex if the transcript mangles shellcraft."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -285,8 +288,8 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     "format_string_payload": {
         "description": (
             "Generate a format string write payload (pwntools fmtstr_payload). "
-            "In run_exploit scripts, copy exploit_lines verbatim OR use bytes.fromhex(payload_hex) — "
-            "never type binary as b'\\\\xdc3@' or change %7$ to %8$."
+            "Prefer exploit_lines (readable fmtstr_payload call). Use exploit_lines_hex / payload_hex "
+            "only if the model corrupts specifiers — never hand-edit %N$ or addresses."
         ),
         "input_schema": {
             "type": "object",
@@ -355,7 +358,7 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         },
     },
     "gdb_breakpoint": {
-        "description": "Set a breakpoint in GDB, run the binary, and return the register/stack state at the breakpoint.",
+        "description": "Set a breakpoint in GDB, run the binary, return registers, stack_dump, compact disassembly at RIP (disassembly), and a shortened run transcript (output).",
         "input_schema": {
             "type": "object",
             "properties": {

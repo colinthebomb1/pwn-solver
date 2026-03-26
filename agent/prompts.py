@@ -71,7 +71,7 @@ NX is disabled, so the stack is executable. The test binary is **Phoenix stack-f
 (`gets` overflow on ~128-byte stack buffer) with a `%p` leak so it works with ASLR on.
 1. `checksec` → NX false / non-executable bit off; no PIE ideal for fixed gadgets if any
 2. `gdb_find_offset` → offset to saved return address (often **136** for 128-byte buffer on amd64)
-3. `shellcraft_generate` or `asm(shellcraft.sh())` → shellcode (typically ~48 bytes on amd64)
+3. `shellcraft_generate` → paste **`exploit_lines`** (`asm(shellcraft.sh())`, etc.); use **`exploit_lines_hex`** only if needed (~48 bytes on amd64 for `sh`)
 4. **Payload layout (reliable):** `shellcode + pad to offset + p64(buf_addr)` — put shellcode at \
 the **start** of the buffer and set RIP to **`buf_addr`** (the leaked `%p`), not `buf+k`. \
 Use `NOP` (`\\x90`) only for padding bytes after the shellcode.
@@ -102,7 +102,8 @@ name like `is_admin` (that often hits the string in `.rodata`, not the variable)
 2. Find the format offset: `AAAAAAAA%p.%p...` until you see `0x4141414141414141` — that index \
 is the `offset` for `format_string_payload` / `fmtstr_payload`.
 3. Call `format_string_payload` (values 0–255 with default **write_size byte** use `%hhn`).
-   In `run_exploit`, paste **`exploit_lines`** or `bytes.fromhex(payload_hex)` only.
+   In `run_exploit`, paste **`exploit_lines`** (readable `fmtstr_payload(...)`). Use **`exploit_lines_hex`**
+   / `payload_hex` only if something corrupts the format specifiers.
    - In raw pwntools, `{addr: 1}` is an **8-byte** write — use `{addr: b'\\\\x01'}` or the MCP
    tool, which maps small ints to single-byte `%hhn`.
    - **Never** hand-type addresses or change `$7` to `$8` in the tool output — misaligned `%n` \
@@ -117,7 +118,7 @@ If one call prints a visible prefix then continues into your format as **one** `
 that prefix length (see knowledge base).
 6. **`no_dollars=True`** on `format_string_payload` when `$` is filtered.
 7. Raw Python fallback: `fmtstr_payload(..., numbwritten=..., no_dollars=...)` — still use \
-`bytes.fromhex` / **verbatim** tool output in `run_exploit`.
+   **`exploit_lines_hex`** / **verbatim** `payload_hex` in `run_exploit` as a fallback.
 
 ### ret2libc leak chain (two-stage)
 When you need **`libc.address`** but have overflow + symbols:
@@ -171,7 +172,8 @@ You MUST keep iterating until:
 
 Write self-contained pwntools scripts. Always:
 - The solver mirrors every `run_exploit` script to `exploits/last_attempt_<binary>.py` (overwritten on each attempt), even when the exploit fails — users can open that file to debug.
-- Use `context.log_level = 'info'` so pwntools output is captured.
+- Prefer **`context.log_level = 'error'`** (or omit it); the runner already quiets pwntools. \
+Use **`debug`** only when debugging. Verbose tube logs waste tokens in tool results.
 - Print the flag or key output explicitly with `print()`.
 - Handle the case where the process crashes (catch and print the crash info).
 - For x86_64: remember stack alignment — if a call to system/puts/etc segfaults, \
