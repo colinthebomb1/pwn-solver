@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import random
+import re
 import sys
 import time
-import random
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -20,6 +21,74 @@ from agent.planner import plan_from_checksec
 from agent.prompts import get_system_prompt
 
 console = Console()
+
+# Strip Markdown inline-code spans with no real content (model often emits `` or ` `).
+_EMPTY_INLINE_CODE = re.compile(r"`[\t \u00a0\n]*`")
+
+
+def _sanitize_agent_text(text: str) -> str:
+    """Remove empty `...` pairs from assistant markdown so the UI isn't littered with ``."""
+    if not text:
+        return text
+    return _EMPTY_INLINE_CODE.sub("", text)
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _default_max_iterations() -> int:
+    """CLI default when `-n` omitted: env `PWN_AGENT_MAX_ITERATIONS`, else 30."""
+    raw = os.environ.get("PWN_AGENT_MAX_ITERATIONS")
+    if raw and str(raw).strip():
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+    return 30
+
+
+# First N messages are fixed (task + bootstrap). Older turns are dropped to cap input tokens.
+_CONTEXT_HEAD_MESSAGES = 2
+
+
+def _trim_conversation(messages: list[dict]) -> None:
+    """Keep opening messages plus the last few assistant↔user rounds (in-place)."""
+    turns = max(1, _env_int("PWN_AGENT_CONTEXT_TURNS", 8))
+    max_tail = turns * 2  # each turn: assistant, then user(tool results)
+    if len(messages) <= _CONTEXT_HEAD_MESSAGES + max_tail:
+        return
+    messages[:] = messages[:_CONTEXT_HEAD_MESSAGES] + messages[-max_tail:]
+
+
+def _shallow_copy_trunc_run_exploit_script(result: Any) -> Any:
+    """Shrink run_exploit tool_result JSON: full script is mirrored on disk already."""
+    if not isinstance(result, dict):
+        return result
+    out = dict(result)
+    sc = out.get("script")
+    lim = _env_int("PWN_AGENT_RUN_EXPLOIT_SCRIPT_SNIP", 1600)
+    if isinstance(sc, str) and len(sc) > lim:
+        out["script"] = (
+            sc[:lim]
+            + "\n# ... truncated for API context; full file: exploits/last_attempt_<binary>.py"
+        )
+    return out
+
+
+def _tool_result_str_for_api(tool_name: str, result: Any, suffix: str = "") -> str:
+    payload = _shallow_copy_trunc_run_exploit_script(result) if tool_name == "run_exploit" else result
+    body = json.dumps(payload, separators=(",", ":"), default=str) + suffix
+    cap = _env_int("PWN_AGENT_TOOL_RESULT_MAX", 4500)
+    if len(body) > cap:
+        body = body[:cap] + "\n... [truncated]"
+    return body
 
 
 def _exploits_dir() -> str:
@@ -321,7 +390,12 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         },
     },
     "run_exploit": {
-        "description": "Execute a pwntools exploit script. Write a complete Python script using pwntools, and this tool will run it and return stdout/stderr/exit_code. Scripts are not persisted unless save_script=true.",
+        "description": (
+            "Execute a pwntools exploit script; returns stdout/stderr/exit_code plus "
+            "shell_detected (uid= seen), flag_detected / flags_found (CTF PREFIX{...} pattern). "
+            "If shell_detected or flag_detected, exploitation succeeded — stop further run_exploit/GDB "
+            "unless the user needs a cleaned-up final script only."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -455,11 +529,11 @@ class PwnAgent:
     def __init__(
         self,
         model: str = "claude-sonnet-4-20250514",
-        max_iterations: int = 30,
+        max_iterations: int | None = None,
         api_key: str | None = None,
     ):
         self.model = model
-        self.max_iterations = max_iterations
+        self.max_iterations = max_iterations if max_iterations is not None else _default_max_iterations()
         self.client = anthropic.Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
 
     def solve(self, binary_path: str, remote: str | None = None) -> AgentResult:
@@ -582,7 +656,7 @@ class PwnAgent:
                 try:
                     response = self.client.messages.create(
                         model=self.model,
-                        max_tokens=4096,
+                        max_tokens=_env_int("PWN_AGENT_MAX_OUTPUT_TOKENS", 3072),
                         system=system,
                         tools=tools,
                         messages=messages,
@@ -607,7 +681,8 @@ class PwnAgent:
 
             for block in assistant_content:
                 if block.type == "text":
-                    console.print(Panel(block.text, title="Agent", border_style="green"))
+                    clean = _sanitize_agent_text(block.text)
+                    console.print(Panel(clean, title="Agent", border_style="green"))
                 elif block.type == "tool_use":
                     tool_use_blocks.append(block)
 
@@ -615,7 +690,7 @@ class PwnAgent:
                 summary = ""
                 for block in assistant_content:
                     if block.type == "text":
-                        summary += block.text
+                        summary += _sanitize_agent_text(block.text)
 
                 last_script = None
                 for tc in reversed(all_tool_calls):
@@ -664,17 +739,19 @@ class PwnAgent:
                                 f"[dim]Latest exploit mirrored to {lp}[/dim]"
                             )
 
-                    # Inject planner strategy after first checksec call
-                    result_str = json.dumps(result, indent=2, default=str)
+                    suffix = ""
                     if tool_name == "checksec" and not planner_injected and isinstance(result, dict):
                         strategy = plan_from_checksec(result)
-                        planner_note = (
-                            f"\n\n[Strategy Hint] Based on checksec: **{strategy.name}** — "
-                            f"{strategy.description}\n"
-                            f"Suggested techniques: {', '.join(strategy.technique_hints)}\n"
-                            f"Suggested tools: {', '.join(strategy.suggested_tools)}"
+                        suffix = (
+                            "\n\n[Strategy Hint] Based on checksec: **"
+                            + strategy.name
+                            + "** — "
+                            + strategy.description
+                            + "\nSuggested techniques: "
+                            + ", ".join(strategy.technique_hints)
+                            + "\nSuggested tools: "
+                            + ", ".join(strategy.suggested_tools)
                         )
-                        result_str += planner_note
                         planner_injected = True
                         console.print(
                             Panel(
@@ -684,8 +761,7 @@ class PwnAgent:
                             )
                         )
 
-                    if len(result_str) > 8000:
-                        result_str = result_str[:8000] + "\n... [truncated]"
+                    result_str = _tool_result_str_for_api(tool_name, result, suffix)
 
                     tool_results.append({
                         "type": "tool_result",
@@ -694,6 +770,7 @@ class PwnAgent:
                     })
 
                 messages.append({"role": "user", "content": tool_results})
+                _trim_conversation(messages)
 
             if response.stop_reason == "end_turn" and tool_use_blocks:
                 continue

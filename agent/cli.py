@@ -16,8 +16,14 @@ console = Console()
 @click.argument("binary", type=click.Path(exists=True))
 @click.option("--remote", "-r", default=None, help="Remote target as host:port")
 @click.option("--model", "-m", default="claude-sonnet-4-20250514", help="Anthropic model to use")
-@click.option("--max-iterations", "-n", default=30, help="Max agent iterations")
-def main(binary: str, remote: str | None, model: str, max_iterations: int) -> None:
+@click.option(
+    "--max-iterations",
+    "-n",
+    default=None,
+    type=int,
+    help="Max ReAct iterations (default: env PWN_AGENT_MAX_ITERATIONS, else 30)",
+)
+def main(binary: str, remote: str | None, model: str, max_iterations: int | None) -> None:
     """pwn-solver — Agentic binary exploitation powered by LLMs and MCP tools."""
     load_dotenv()
 
