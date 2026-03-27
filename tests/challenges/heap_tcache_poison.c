@@ -39,7 +39,6 @@ static void do_alloc(void) {
     }
     notes[idx] = malloc(NOTE_SIZE);
     printf("chunk at %p\n", notes[idx]);
-    memset(notes[idx], 0, NOTE_SIZE);
 }
 
 static void do_free(void) {
