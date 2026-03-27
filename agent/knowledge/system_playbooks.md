@@ -127,7 +127,7 @@ Tcache notes (glibc 2.35+ safe-linking):
   2. Free `B`, then `A` (bin head is `A -> B`).
   3. Use UAF on `A` to overwrite its encoded `fd` with `((A_addr >> 12) ^ target)`.
   4. Allocate once (gets `A`), allocate again (returns `target` overlap).
-  5. Write non-zero to target gate (e.g. `is_admin`) and trigger flag path.
+  5. Write non-zero to the target gate (e.g. a permission/flag variable) and trigger the success path.
 
 When available, parse target pointers from banner text (e.g. `is_admin is at %p`) instead of guessing
 symbol addresses from disassembly.
