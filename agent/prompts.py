@@ -18,20 +18,3 @@ def get_system_prompt() -> str:
         parts.append("---\n\n## Bundled knowledge base\n\n" + kb.read_text(encoding="utf-8").strip())
 
     return "\n\n".join([p for p in parts if p])
-
-
-def format_tool_result(tool_name: str, result: object) -> str:
-    """Format a tool result for inclusion in the conversation."""
-    import json
-
-    if isinstance(result, dict):
-        formatted = json.dumps(result, separators=(",", ":"), default=str)
-    elif isinstance(result, list):
-        formatted = json.dumps(result, separators=(",", ":"), default=str)
-    else:
-        formatted = str(result)
-
-    if len(formatted) > 4500:
-        formatted = formatted[:4500] + "\n... [truncated]"
-
-    return formatted

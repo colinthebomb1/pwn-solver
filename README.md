@@ -19,7 +19,6 @@ Agentic binary exploitation framework built around an LLM-driven ReAct loop, MCP
 - `agent/` - ReAct loop, prompts, planner, CLI entrypoint
 - `mcp-servers/` - MCP tool servers (`exploit-tools`, `dynamic-analysis`)
 - `tests/` - unit/integration tests + challenge binaries/sources
-- `configs/` - default runtime configuration
 - `exploits/` - generated solve scripts and latest attempt mirrors
 
 ## Requirements
