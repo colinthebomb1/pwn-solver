@@ -95,6 +95,55 @@ def _tool_result_str_for_api(tool_name: str, result: Any, suffix: str = "") -> s
     return body
 
 
+def _usage_to_dict(usage: Any) -> dict[str, int]:
+    """Normalize Anthropic usage object/dict to a dict of ints."""
+    if usage is None:
+        return {}
+    if isinstance(usage, dict):
+        out: dict[str, int] = {}
+        for k, v in usage.items():
+            if isinstance(v, bool):
+                continue
+            if isinstance(v, (int, float)):
+                out[str(k)] = int(v)
+            elif isinstance(v, str) and v.isdigit():
+                out[str(k)] = int(v)
+        return out
+
+    out = {}
+    for k in (
+        "input_tokens",
+        "output_tokens",
+        "cache_creation_input_tokens",
+        "cache_read_input_tokens",
+    ):
+        v = getattr(usage, k, None)
+        if isinstance(v, (int, float)):
+            out[k] = int(v)
+    return out
+
+
+def _usage_add(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
+    out = dict(a)
+    for k, v in b.items():
+        out[k] = out.get(k, 0) + int(v)
+    return out
+
+
+def _format_usage_summary(u: dict[str, int]) -> str:
+    if not u:
+        return "usage: (unavailable)"
+    inp = u.get("input_tokens", 0)
+    out = u.get("output_tokens", 0)
+    cwrite = u.get("cache_creation_input_tokens", 0)
+    cread = u.get("cache_read_input_tokens", 0)
+    parts = [f"in={inp}", f"out={out}"]
+    if cwrite or cread:
+        parts.append(f"cache_write_in={cwrite}")
+        parts.append(f"cache_read_in={cread}")
+    return "usage: " + ", ".join(parts)
+
+
 def _exploits_dir() -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "exploits"))
 
@@ -225,6 +274,16 @@ class PwnAgent:
             host, port = remote.split(":")
             system += f"\n\nRemote target: {host}:{port}"
 
+        system_blocks: list[dict[str, Any]] = [
+            {
+                "type": "text",
+                "text": system,
+                # Anthropic prompt caching (ephemeral ~5 min TTL). Biggest win: the system prompt
+                # is reused across iterations in the ReAct loop.
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+
         # ------------------------------------------------------------------
         # Bootstrap analysis (cheap local tools)
         # ------------------------------------------------------------------
@@ -304,6 +363,7 @@ class PwnAgent:
 
         all_tool_calls: list[dict] = []
         planner_injected = False
+        total_usage: dict[str, int] = {}
 
         for iteration in range(1, self.max_iterations + 1):
             console.print(f"\n[dim]─── Iteration {iteration}/{self.max_iterations} ───[/dim]")
@@ -316,7 +376,7 @@ class PwnAgent:
                     response = self.client.messages.create(
                         model=self.model,
                         max_tokens=_env_int("PWN_AGENT_MAX_OUTPUT_TOKENS", 3072),
-                        system=system,
+                        system=system_blocks,
                         tools=tools,
                         messages=messages,
                     )
@@ -341,6 +401,9 @@ class PwnAgent:
 
             assistant_content = response.content
             tool_use_blocks = []
+            total_usage = _usage_add(
+                total_usage, _usage_to_dict(getattr(response, "usage", None))
+            )
 
             for block in assistant_content:
                 if block.type == "text":
@@ -361,6 +424,13 @@ class PwnAgent:
                         last_script = tc["input"].get("script")
                         break
 
+                console.print(
+                    Panel(
+                        _format_usage_summary(total_usage),
+                        title="Tokens/Cache",
+                        border_style="blue",
+                    )
+                )
                 return AgentResult(
                     success=True,
                     summary=summary,
@@ -442,6 +512,13 @@ class PwnAgent:
             if response.stop_reason == "end_turn" and tool_use_blocks:
                 continue
 
+        console.print(
+            Panel(
+                _format_usage_summary(total_usage),
+                title="Tokens/Cache",
+                border_style="blue",
+            )
+        )
         return AgentResult(
             success=False,
             summary="Max iterations reached without solving the challenge.",
