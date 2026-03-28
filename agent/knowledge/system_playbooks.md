@@ -106,7 +106,7 @@ def show(i):  p.sendlineafter(b'> ', b'4'); p.sendlineafter(b'index', str(i).enc
 When binaries mix `scanf("%d", ...)` for menu choices with raw `read()` for edit/write:
 
 - Do **not** validate full exploit flows via one giant static stdin transcript (`gdb_run` input blob).
-  `read()` can greedily consume bytes that were intended as later menu choices, causing fake `bye` exits.
+  `read()` can greedily consume bytes that were intended as later menu choices, causing unintended early exits.
 - Use interactive pwntools sequencing for exploit attempts (`sendlineafter` / `sendafter`) and resync
   to menu prompt after each action.
 - For raw binary writes, prefer `sendafter(b"data: ", payload)` (not `sendline`) to avoid accidental
