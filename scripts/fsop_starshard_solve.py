@@ -3,7 +3,9 @@
 Skeleton solve for tests/challenges/fsop_starshard_x64 — Starshard / HTB University FSOP style.
 
 Follow the chain from public write-ups (format → OOB FILE leak → fclose UAF → malloc reclaim →
-fputs → _IO_wfile_overflow → _IO_wdoallocbuf → wide_vtable[0x68]).
+fputs → _IO_wfile_overflow → _IO_wdoallocbuf → wide_vtable[0x68]). The feed_fragment malloc size
+must match the freed FILE chunk’s bin (libc-specific; often ~0x1d0 usable — use
+malloc_usable_size after fopen or trial mallocs until malloc(k) == old FILE* after fclose).
 
 Reference layout (adapt offsets to your libc / pwntools):
   - build_fake_file_patch() in seks99x / Medium article: flags, /bin/sh at +8, wide_data=self,
@@ -21,7 +23,7 @@ from __future__ import annotations
 # 2) parse leak → libc.address
 # 3) menu 1 (arm): send 0x18 bytes routine name (no newline) → OOB leak FILE* from printf %s
 # 4) menu 3 (cancel): fclose UAF
-# 5) menu 2 (feed): malloc(0x1d0) or matching FILE chunk size; fgets fake FILE blob
+# 5) menu 2 (feed): malloc(K) where K matches freed FILE chunk size class (not an arbitrary small K)
 # 6) menu 4 (commit): fputs → FSOP
 #
 # from pwn import *

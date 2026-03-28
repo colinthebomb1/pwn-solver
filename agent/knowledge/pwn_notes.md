@@ -75,7 +75,9 @@ vtable tricks (e.g. **`_IO_wfile_jumps - 0x18`** + wfile underflow chains on mod
 **`_IO_str_overflow` / `fclose`**-style paths; all are **libc-version-sensitive**. Leak **`libc.base`**
 from the **vtable qword at `FILE+0xd8`** minus **`_IO_file_jumps`**. `_IO_FILE` is ~0x1d8 bytes;
 `_IO_vtable_check` rejects arbitrary heap “fake vtables”. Use **`FileStructure`** and **`gdb_examine
-&_IO_2_1_stdout_`** on the target libc before crafting payloads.
+&_IO_2_1_stdout_`** on the target libc before crafting payloads. If the primitive is **`fclose` UAF** and
+you **`malloc` a fake `FILE`**, the request size must match the **freed stream chunk’s bin**
+(`malloc_usable_size` / trial reclaims) — wrong size means no overlap.
 
 ## Misc tricks
 

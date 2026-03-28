@@ -138,6 +138,15 @@ symbol addresses from disassembly.
 `FILE *` / `_IO_FILE_plus` (UAF on a pointer that still aliases the struct, overlap, or poisoned
 chunk) plus a **trigger** (`fflush(fp)`, `fclose(fp)`, `exit`, `fflush(NULL)`) is the core pattern.
 
+**`fclose` UAF + heap reclaim:** If the chain is **`fclose(fp)`** (stream freed) but a **global still
+holds the old `FILE *`**, the next step is often **`malloc` + write fake struct** into that address.
+That only works if your **`malloc(n)` lands in the same size class** as the chunk glibc used for the
+`FILE` object. **Wrong `n` (e.g. 0x100 when the `FILE` chunk is ~0x1d0 usable)** → a **different** bin → **no
+reclaim** → `fputs` still sees freed/corrupt data. **Measure on the target libc:** e.g. one-shot
+`malloc_usable_size(fp)` right after `fopen`, or **`heap bins` / trial `malloc` sizes** in GDB until
+`malloc(k)` returns the **same pointer** as the old `FILE *` after `fclose`. Starshard-style labs
+that let you **choose** `malloc` size in-menu depend on this match.
+
 **Pick the technique from RELRO (use `checksec` / `readelf -d` for `BIND_NOW`):**
 
 | Mitigation | Practical FSOP direction |
@@ -248,6 +257,8 @@ chains — see public writeups (e.g. byor / “nobodyisnobody” style FSOP) for
 - **`fileno == -1`** — some paths **skip** the syscall; set a **valid fd** (often **`1`**) when the chain needs it
 - **Wide vs narrow `FILE`:** **`fopen`** streams may still hit **wfile** paths depending on flags and
   glibc — if Path A fails on Full RELRO, re-read **`checksec`** and switch to Path B/C
+- **Reclaim size mismatch** after **`fclose` UAF** — arbitrary **`malloc(100)`** will not refill a
+  **`FILE`-sized** chunk; pick **`malloc` request size** that matches the freed chunk (see **`fclose` UAF + heap reclaim`** above).
 
 ### GDB / dynamic analysis
 

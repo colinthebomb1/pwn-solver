@@ -5,6 +5,11 @@
  * fclose UAF → malloc+fgets reclaim → fputs trigger), e.g.:
  *   https://medium.com/... (seks99x, FSOP Advanced Heap & File Struct)
  *
+ * Reclaim hint: after fclose, the old FILE* chunk goes to a tcache/smallbin bin. The next
+ * malloc(fragment_sz) must request a size in the **same class** as that chunk or reclaim fails
+ * (wrong bin → fake FILE never overlaps the freed FILE). On typical glibc this is hundreds of
+ * bytes, not e.g. 0x100 — measure with malloc_usable_size(FILE*) after fopen on your libc.
+ *
  * This binary does **not** ship a flag or a “win” symbol — the goal is practicing the
  * chain (wide_data / _IO_wfile_jumps / _IO_wdoallocbuf), not popping a shell here.
  *
