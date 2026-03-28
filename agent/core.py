@@ -52,7 +52,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 
 def _bootstrap_ghidra_function_names(func_addrs: dict[str, Any], max_funcs: int) -> list[str]:
-    """Pick a bounded set of symbol names to decompile at startup (prioritize interesting entrypoints)."""
+    """Pick bounded symbol names for startup decompilation (prioritize main/vuln/win)."""
     if not isinstance(func_addrs, dict) or not func_addrs:
         return ["main"]
     keys = [k for k in func_addrs if isinstance(k, str)]

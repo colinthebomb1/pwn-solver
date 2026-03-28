@@ -9,9 +9,8 @@ import pytest
 
 
 def _load_run_ghidra_decompile():
-    path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "mcp-servers", "exploit-tools", "ghidra_decompile.py")
-    )
+    _root = os.path.join(os.path.dirname(__file__), "..", "mcp-servers", "exploit-tools")
+    path = os.path.abspath(os.path.join(_root, "ghidra_decompile.py"))
     spec = importlib.util.spec_from_file_location("ghidra_decompile_test", path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Cannot load {path}")
@@ -32,6 +31,7 @@ def test_run_ghidra_decompile_empty_functions():
 def test_run_ghidra_decompile_missing_binary():
     r = run_ghidra_decompile("/nonexistent/no_such_binary", ["main"])
     assert r.get("ok") is False
+    assert "not found" in (r.get("error") or "").lower()
 
 
 def test_run_ghidra_decompile_no_ghidra_home(monkeypatch):
@@ -56,9 +56,15 @@ def _ghidra_headless_available() -> bool:
     return False
 
 
-@pytest.mark.skipif(not _ghidra_headless_available(), reason="Ghidra headless / GHIDRA_HOME not available")
-def test_run_ghidra_decompile_smoke_ret2win():
+@pytest.mark.skipif(
+    not _ghidra_headless_available(),
+    reason="Ghidra headless / GHIDRA_HOME not available",
+)
+def test_run_ghidra_decompile_smoke_ret2win(tmp_path, monkeypatch):
     """End-to-end headless run (requires Java + Ghidra on the runner)."""
+    # Writable HOME so Ghidra can create ~/.config (CI/sandbox often lacks a real home).
+    monkeypatch.setenv("HOME", str(tmp_path))
+
     here = os.path.dirname(__file__)
     chal = os.path.join(here, "challenges", "ret2win_x64")
     if not os.path.isfile(chal):
