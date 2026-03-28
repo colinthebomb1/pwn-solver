@@ -59,10 +59,20 @@ NX is disabled, so the stack is executable. The test binary is **Phoenix stack-f
 `printf(user_input)` lets you read from the stack.
 
 1. `checksec` → note mitigations
-2. Dump stack: `%p` chain, or **`AAAAAAAA` + `%p.%p...`** until you see **`0x4141414141414141`** to align read position with write exploits.
-3. **Leak triage (amd64 heuristics — confirm per target):** addresses starting **`0x55`/`0x56`** often map the **PIE binary**; **`0x7fff`/`0x7ffc`** often **stack**; **`0x7f`…** (non-stack) often **libc**. Use **`gdb_examine`** / **`gdb_stack`** to verify before computing bases.
-4. One-shot multiplex: e.g. `%11$p%16$p%9$p` with stable parsing when the challenge allows **and** the vulnerable buffer can hold the full string (watch **`fgets` / `read` length**).
-5. **Short format buffer:** if the bug only receives **8–16 bytes** (truncated `tinkerer_name`–style), you cannot pack many `%p` in one go. **Probe one index per run:** spawn the binary, send **`%6$p\\n`**, parse libc/PIE/stack from output; repeat with **`%7$p`**, **`%8$p`**, … on **fresh processes**. Stack slots for `printf` arguments are stable across runs at the same program point — merge leaks in the exploit script. Avoid gdb-only assumptions when automating.
+2. **Prefer multi-run leaks (default for this agent):** use **one** **`%N$p\\n`** per **fresh process**, sweep **`N`** in a loop (e.g. 1–40), parse each line offline. Same `printf` call site → **stable** argument indices across runs. Avoid long **`%p.%p.%p...`** unless you have verified the buffer fits (**`fgets` / `read` length**); short name buffers (**≤15** chars before newline) **cannot** hold multiplex format strings.
+3. **What leaked pointers often look like (amd64 Linux, heuristics — confirm with `gdb_vmmap` / `gdb_stack`):**
+
+   | Kind | Typical form | Notes |
+   |------|----------------|------|
+   | **PIE text / known symbol** | **`0x55xxxxxxxxxx`** or **`0x56xxxxxxxxxx`** | Often page-aligned (low 12 bits `0`); subtract **`elf_symbols`** offset → **`pie_base`**. |
+   | **Heap (malloc)** | Often **`0x55…` / `0x56…`** in the same process | **Same prefix as PIE** — do not assume “`0x55` = code”; use **distance from known mapping**, **`heap`**, or a **second leak** (e.g. `main`) to separate heap vs PIE. |
+   | **Libc** | **`0x7fxxxxxxxxxxxx`** (mapped segment) | Often **not** the narrow user-stack window; subtract **`__libc_start_main`**, **`puts`**, **`_IO_2_1_stdout_`**, etc. → **`libc.address`**. |
+   | **Stack** | **`0x7fff…`**, **`0x7ffe…`**, **`0x7ffd…`** common | Saved RIP / frame pointers / env — useful for pivot math; **not** libc base by itself. |
+
+   **`0x7f…`** can still be **non-libc** (vdso, other mappings, rare layouts) — if **`libc_base_from_leak`** fails, **try another** `%N$p` value.
+
+4. **Resolving bases — try several candidates:** One leaked qword may be stack noise or a bad guess. For each plausible pointer: call **`libc_base_from_leak`** / **`pie_base_from_leak`** with **different** **`leaked_symbol`** choices (`main`, `__libc_start_main`, `puts`, …) until the result is **consistent** (base page-aligned, **`checksec`**-compatible). If no candidate works, **widen the `%N$p` sweep** or use **`gdb_stack`** at **`main`** / at **`printf`** to see real stack slots.
+5. Dump / align for **writes:** **`AAAAAAAA` + `%p.%p...`** until **`0x4141414141414141`** only when the buffer allows; otherwise derive offset from multi-run **`%N$p`** + GDB.
 6. **`%N$s`** — only if argument **N** holds a **valid pointer**; else SIGSEGV. Useful for strings already on stack (opened file path, env).
 7. If the challenge **filters `$`**, use **`%c` chains** or raw pwntools **`fmtstr_payload(..., no_dollars=True)`**; the `format_string_payload` tool has **`no_dollars`** for that.
 

@@ -28,13 +28,14 @@ Use the agent’s **`checksec`** first; confirm with **`elf_symbols`** (PLT/GOT)
 
 ## Format string — reading (leaks)
 
-- Loop **`%{i}$p`** (or `%{i}$p|` with a delimiter) to map stack slots.
-- **Tight format buffer (e.g. `fgets` into 8–16 bytes):** you cannot fit `%6$p%7$p%8$p...` in one read. Use **one positional leak per process run**: run **`%6$p`**, restart; **`%7$p`**, restart; … (or automate in a loop). Same stack layout each run → combine leaks offline. Do not assume one long format string will work when the name/buffer is truncated.
-- **Rough leak triage (amd64, heuristic):**
-  - **`0x55…` / `0x56…`** → often **PIE** mapping → `leaked - offset(symbol)` ≈ binary base.
-  - **`0x7fff…` / `0x7ffc…`** → often **stack** → distances to saved RIP / saved pointers (use **`gdb_stack`** / telescope).
-  - **`0x7f…`** but not the stack prefix above → often **libc** / loader → subtract known symbol offset for libc base (symbol varies by libc build; prefer **`__libc_start_main`** / `puts` / `_IO_2_1_stdout_` etc. from your ELF).
-- **Multiplex:** one send like `%11$p%16$p%9$p` when the **buffer is long enough** and layout is stable; parse fixed widths carefully or use delimiters. If the buffer is short, use **multi-run** leaks instead (see above).
+- **Default:** **multi-run** — one **`%{i}$p`** per **new process**, sweep **`i`** (loop or script). Do not rely on one long `%p.%p…` unless the vulnerable buffer is proven long enough (**`fgets` to 16 bytes ⇒ max ~15 chars** before newline — multiplex usually **fails**).
+- **What addresses tend to look like (amd64):**
+  - **PIE (code / symbols like `main`):** **`0x55…` / `0x56…`**, often page-aligned → subtract symbol offset for **`pie_base`**.
+  - **Heap (`malloc`):** often **`0x55…` / `0x56…` too** — overlaps PIE **prefix**; tell apart with **two leaks** (e.g. code vs chunk), **`vmmap`**, or distance from known base.
+  - **Libc:** **`0x7f…`** in a **mapped** range; subtract **`__libc_start_main`**, **`puts`**, etc. → **`libc.base`**. **`0x7fff/7ffe/7ffd…`** are usually **stack**, not libc.
+  - **Stack:** **`0x7fff…` / `0x7ffe…`** typical for RSP region.
+- **If a leak does not resolve to a base:** try **another** `%N$p`, or the same value with **different** **`leaked_symbol`** in **`libc_base_from_leak`** / **`pie_base_from_leak`**; confirm with **`gdb_stack`** / **`vmmap`** instead of guessing “libc” from prefix alone.
+- **Multiplex** (`%11$p%16$p…`) only when the buffer **provably** fits and parsing is stable; otherwise **multi-run**.
 - **String leak:** `%{i}$s` only when the **i-th “argument” is a valid readable pointer** — otherwise crash. Use for flag buffers / env already on stack.
 
 ## Format string — writing
