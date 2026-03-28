@@ -15,5 +15,8 @@ The host may **drop older chat turns** to limit API spend. If you need a prior G
    - PIE enabled → need info leak first
    - Canary → need canary leak (format string or brute force)
    - Full RELRO → can't overwrite GOT, use other targets
+   - FSOP (glibc ≥ 2.34, hooks gone) → `FILE*` write + trigger (`fflush`/`fclose`); leak libc (e.g.
+     vtable at `FILE+0xd8`). **Partial RELRO:** `FileStructure` + fflush → GOT. **Full RELRO:** no GOT —
+     libc vtable chains (e.g. `_IO_wfile_jumps - 0x18` / wfile path, or `_IO_str_overflow` via `fclose`)
 5. **Exploit** — Write a pwntools exploit script and test it with `run_exploit`. If it fails, analyze the error output, adjust offsets or approach, and retry.
 6. **Iterate** — If the exploit crashes, use GDB tools to inspect. Check stack alignment (add a `ret` gadget before function calls on x86_64), verify offsets with `gdb_find_offset`.
