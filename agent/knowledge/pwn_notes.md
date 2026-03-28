@@ -28,7 +28,8 @@ Use the agent’s **`checksec`** first; confirm with **`elf_symbols`** (PLT/GOT)
 
 ## Format string — reading (leaks)
 
-- **Default:** **multi-run** — one **`%{i}$p`** per **new process**, sweep **`i`** (loop or script). Do not rely on one long `%p.%p…` unless the vulnerable buffer is proven long enough (**`fgets` to 16 bytes ⇒ max ~15 chars** before newline — multiplex usually **fails**).
+- **Default:** **multi-run** — one **`%{i}$p`** per **new process**, sweep **`i`** (loop or script). Do not rely on one long `%p.%p…` unless the vulnerable buffer is proven long enough (**`fgets` to 16 bytes ⇒ max ~15 chars** before newline — multiplex usually **fails**). Comma-separated **`addr,addr,%N$p`** in one line **still** hits the same limit → truncated specifiers (`%19!`). **`run_exploit`** may **time out (~30s)** on huge loops — batch leaks or use GDB.
+- **`elf_search("g_cs")` is wrong:** that tool searches **file bytes**, not symbol tables — use **`elf_symbols`** / **`gdb_examine`**.
 - **What addresses tend to look like (amd64):**
   - **PIE (code / symbols like `main`):** **`0x55…` / `0x56…`**, often page-aligned → subtract symbol offset for **`pie_base`**.
   - **Heap (`malloc`):** often **`0x55…` / `0x56…` too** — overlaps PIE **prefix**; tell apart with **two leaks** (e.g. code vs chunk), **`vmmap`**, or distance from known base.

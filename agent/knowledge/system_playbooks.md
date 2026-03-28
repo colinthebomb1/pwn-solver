@@ -59,8 +59,9 @@ NX is disabled, so the stack is executable. The test binary is **Phoenix stack-f
 `printf(user_input)` lets you read from the stack.
 
 1. `checksec` → note mitigations
-2. **Prefer multi-run leaks (default for this agent):** use **one** **`%N$p\\n`** per **fresh process**, sweep **`N`** in a loop (e.g. 1–40), parse each line offline. Same `printf` call site → **stable** argument indices across runs. Avoid long **`%p.%p.%p...`** unless you have verified the buffer fits (**`fgets` / `read` length**); short name buffers (**≤15** chars before newline) **cannot** hold multiplex format strings.
-3. **What leaked pointers often look like (amd64 Linux, heuristics — confirm with `gdb_vmmap` / `gdb_stack`):**
+2. **Prefer multi-run leaks (default for this agent):** use **one** **`%N$p\\n`** per **fresh process**, sweep **`N`** in a loop (e.g. 1–40), parse each line offline. Same `printf` call site → **stable** argument indices across runs. Avoid long **`%p.%p.%p...`** unless you have verified the buffer fits (**`fgets` / `read` length**); short name buffers (**≤15** chars before newline) **cannot** hold multiplex format strings. **Do not** pack comma-separated **`%a,%b,%c`**-style multiplex in one read — it still **overflows the same short buffer** and yields garbage like **`%19!`**. **`run_exploit`** often has a **~30s timeout:** a tight loop that **spawns dozens of processes** may return **timeout / exit -9** — batch indices (e.g. 1–10 per script), use **`gdb_run`** / **`gdb_breakpoint`** for a few **`N`**, or rely on **`gdb_stack`** instead of a giant automated sweep in one tool call.
+3. **Do not use `elf_search` for globals:** it matches **raw bytes / strings** in the file. **`g_cs`** and other symbol names are **not** embedded as ASCII — use **`elf_symbols`** / **`gdb_examine`** on the known **`g_cs`** address from bootstrap or disassembly.
+4. **What leaked pointers often look like (amd64 Linux, heuristics — confirm with `gdb_vmmap` / `gdb_stack`):**
 
    | Kind | Typical form | Notes |
    |------|----------------|------|
@@ -71,10 +72,10 @@ NX is disabled, so the stack is executable. The test binary is **Phoenix stack-f
 
    **`0x7f…`** can still be **non-libc** (vdso, other mappings, rare layouts) — if **`libc_base_from_leak`** fails, **try another** `%N$p` value.
 
-4. **Resolving bases — try several candidates:** One leaked qword may be stack noise or a bad guess. For each plausible pointer: call **`libc_base_from_leak`** / **`pie_base_from_leak`** with **different** **`leaked_symbol`** choices (`main`, `__libc_start_main`, `puts`, …) until the result is **consistent** (base page-aligned, **`checksec`**-compatible). If no candidate works, **widen the `%N$p` sweep** or use **`gdb_stack`** at **`main`** / at **`printf`** to see real stack slots.
-5. Dump / align for **writes:** **`AAAAAAAA` + `%p.%p...`** until **`0x4141414141414141`** only when the buffer allows; otherwise derive offset from multi-run **`%N$p`** + GDB.
-6. **`%N$s`** — only if argument **N** holds a **valid pointer**; else SIGSEGV. Useful for strings already on stack (opened file path, env).
-7. If the challenge **filters `$`**, use **`%c` chains** or raw pwntools **`fmtstr_payload(..., no_dollars=True)`**; the `format_string_payload` tool has **`no_dollars`** for that.
+5. **Resolving bases — try several candidates:** One leaked qword may be stack noise or a bad guess. For each plausible pointer: call **`libc_base_from_leak`** / **`pie_base_from_leak`** with **different** **`leaked_symbol`** choices (`main`, `__libc_start_main`, `puts`, …) until the result is **consistent** (base page-aligned, **`checksec`**-compatible). If no candidate works, **widen the `%N$p` sweep** or use **`gdb_stack`** at **`main`** / at **`printf`** to see real stack slots.
+6. Dump / align for **writes:** **`AAAAAAAA` + `%p.%p...`** until **`0x4141414141414141`** only when the buffer allows; otherwise derive offset from multi-run **`%N$p`** + GDB.
+7. **`%N$s`** — only if argument **N** holds a **valid pointer**; else SIGSEGV. Useful for strings already on stack (opened file path, env).
+8. If the challenge **filters `$`**, use **`%c` chains** or raw pwntools **`fmtstr_payload(..., no_dollars=True)`**; the `format_string_payload` tool has **`no_dollars`** for that.
 
 ### Format string — write (overwrite memory)
 
