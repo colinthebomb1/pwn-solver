@@ -31,8 +31,8 @@ Agentic binary exploitation framework built around an LLM-driven ReAct loop, MCP
 ## Installation
 
 ```bash
-git clone https://github.com/colinthebomb1/pwn-solver.git
-cd pwn-solver
+git clone https://github.com/colinthebomb1/AutoPwn.git
+cd AutoPwn
 python -m venv .venv
 source .venv/bin/activate
 pip install .
