@@ -35,7 +35,7 @@ git clone https://github.com/colinthebomb1/pwn-solver.git
 cd pwn-solver
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev,pwn]"
+pip install .
 ```
 
 ## Configuration
