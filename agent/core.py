@@ -519,6 +519,10 @@ class AutoPwnAgent:
                     "but if bootstrap provides those values, reuse them. "
                     "If bootstrap includes `ghidra_decompile` with ok=true, treat that pseudocode "
                     "as primary source for control flow before writing exploits. "
+                    "On static binaries, avoid broad "
+                    "`elf_symbols(symbol_type='all', symbol_scope='all')` unless you need "
+                    "runtime/libc/compiler symbols for a specific reason; prefer the default "
+                    "narrower symbol scope and curated `strings_search` output first. "
                     "Use gdb_find_offset to determine buffer overflow offsets precisely."
                 ),
             }
