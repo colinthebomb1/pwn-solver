@@ -44,14 +44,14 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         },
     },
     "elf_symbols": {
-        "description": "List symbols from an ELF binary: functions, PLT, GOT, and sections. On static binaries, prefer the default auto/user-focused scope unless you truly need runtime noise.",
+        "description": "List symbols from an ELF binary: functions, PLT, GOT, named objects/globals, and sections. On static binaries, prefer the default auto/user-focused scope unless you truly need runtime noise.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "binary_path": {"type": "string", "description": "Path to the ELF binary"},
                 "symbol_type": {
                     "type": "string",
-                    "enum": ["all", "functions", "plt", "got"],
+                    "enum": ["all", "functions", "plt", "got", "objects"],
                     "description": "Type of symbols to list. Defaults to 'all'.",
                 },
                 "symbol_scope": {
@@ -83,16 +83,16 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         },
     },
     "rop_gadgets": {
-        "description": "Search for ROP gadgets in a binary. Uses pwntools ROP engine plus raw byte-pattern search for common gadgets.",
+        "description": "Search for ROP gadgets in a binary. With no `search`, returns a curated common gadget pack first so you usually do not need multiple narrow gadget calls.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "binary_path": {"type": "string", "description": "Path to the ELF binary"},
                 "search": {
                     "type": "string",
-                    "description": "Filter string (e.g. 'pop rdi', 'ret'). If omitted, returns all gadgets.",
+                    "description": "Optional filter string (e.g. 'pop rdi', 'ret'). If omitted, returns the common gadget pack.",
                 },
-                "max_results": {"type": "integer", "description": "Max gadgets to return. Default 50."},
+                "max_results": {"type": "integer", "description": "Max gadgets to return. Default 128."},
             },
             "required": ["binary_path"],
         },
@@ -237,7 +237,8 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "description": (
             "Build a ROP payload that first writes attacker-controlled bytes into writable memory "
             "with gets/read, then calls a function like system() on that address. Useful when "
-            "the binary has system@plt but no '/bin/sh' string in memory."
+            "the binary has system@plt but no '/bin/sh' string in memory. Trust the helper's "
+            "default writable address unless you have evidence that a different target is safer."
         ),
         "input_schema": {
             "type": "object",

@@ -28,20 +28,23 @@ No win function, but `system()` is in PLT or libc. Build a ROP chain to call `sy
    - Find a binary leak you can use for PIE base (often: `main is at %p` or similar).
    - Use `pie_base_from_leak` to compute `pie_base`.
    - When building ROP payloads with `ret2libc_stage1_payload` / `ret2libc_stage2_payload`, pass `pie_base` so gadget/plt/got addresses are relocated.
-4. If binary has no `system@plt` or `/bin/sh` in `.rodata`, do a **2-stage leak**:
+4. For gadget recon, call `rop_gadgets(binary_path)` with no search first. The default output is a curated common gadget pack; only do narrow `search=` calls if something you need is missing.
+5. If binary has no `system@plt` or `/bin/sh` in `.rodata`, do a **2-stage leak**:
    - Stage 1: use `ret2libc_stage1_payload` to leak `puts@got` via `puts@plt`, then return to `main`.
    - Parse leaked pointer from output bytes between stable markers (often after `bye\\n` and before next prompt).
    - Do NOT assume first post-payload line is the leak; there may be blank/newline noise.
-5. Resolve libc with tools:
+6. Resolve libc with tools:
    - `libc_symbols` to check offsets / availability.
    - `libc_base_from_leak` using leaked symbol + leaked addr.
-6. Stage 2:
+7. Stage 2:
    - `ret2libc_stage2_payload` to call `system("/bin/sh")` with computed libc base.
    - Keep a `ret` for stack alignment on amd64 before `system`.
-7. If the binary has `system@plt` but no `/bin/sh` string, use
+8. If the binary has `system@plt` but no `/bin/sh` string, use
    `rop_write_string_and_call_payload` to stage `/bin/sh` into writable memory
-   with `gets`/`read`, then call `system(writable_addr)`.
-8. Validate shell robustly (`id` -> `uid=`), not just process non-crash.
+   with `gets`/`read`, then call `system(writable_addr)`. Prefer the helper's
+   default writable address unless `elf_symbols(..., symbol_type="objects")` or
+   a debugger gives you a clearly safer named target.
+9. Validate shell robustly (`id` -> `uid=`), not just process non-crash.
    - Send `id` then collect with `recvrepeat(timeout)` (or multiple recv attempts), because first read can be `b'\\n'` or banner text.
    - Treat `uid=` anywhere in collected bytes as success.
 
