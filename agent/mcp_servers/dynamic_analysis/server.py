@@ -28,7 +28,7 @@ _session: GDBSession | None = None
 def _get_session() -> GDBSession:
     global _session
     if _session is None or not _session.alive:
-        _session = GDBSession(timeout=30)
+        _session = GDBSession(timeout=15)
     return _session
 
 
@@ -101,7 +101,7 @@ def gdb_find_offset(binary_path: str, pattern_length: int = 300) -> dict:
 
     session = _get_session()
     session.start(path)
-    output = session.run_with_stdin(pattern, timeout=30)
+    output = session.run_with_stdin(pattern, timeout=15)
 
     # Get the signal info
     signal_info = "unknown"
@@ -209,9 +209,9 @@ def gdb_run(
         session.command(f"set args {args}")
 
     if stdin_data:
-        output = session.run_with_stdin(stdin_data.encode("latin-1"), timeout=30)
+        output = session.run_with_stdin(stdin_data.encode("latin-1"), timeout=15)
     else:
-        output = session.command("run", timeout=30)
+        output = session.command("run", timeout=15)
 
     # Check for signal/crash
     signal_info = None
@@ -268,9 +268,9 @@ def gdb_breakpoint(
     session.command(f"break *{address}" if address.startswith("0x") else f"break {address}")
 
     if stdin_data:
-        output = session.run_with_stdin(stdin_data.encode("latin-1"), timeout=30)
+        output = session.run_with_stdin(stdin_data.encode("latin-1"), timeout=15)
     else:
-        output = session.command("run", timeout=30)
+        output = session.command("run", timeout=15)
 
     if _gdb_command_failed(output):
         session.close()
@@ -341,9 +341,9 @@ def gdb_examine(
         session.command(f"break {bp_addr}")
 
     if stdin_data:
-        session.run_with_stdin(stdin_data.encode("latin-1"), timeout=30)
+        session.run_with_stdin(stdin_data.encode("latin-1"), timeout=15)
     elif break_at:
-        session.command("run", timeout=30)
+        session.command("run", timeout=15)
 
     result = session.command(f"x/{count}{format} {address}")
     session.close()
@@ -371,9 +371,9 @@ def gdb_vmmap(binary_path: str, stdin_data: str | None = None) -> dict:
 
     session.command("break main")
     if stdin_data:
-        session.run_with_stdin(stdin_data.encode("latin-1"), timeout=30)
+        session.run_with_stdin(stdin_data.encode("latin-1"), timeout=15)
     else:
-        session.command("run", timeout=30)
+        session.command("run", timeout=15)
 
     result = session.command("vmmap")
     session.close()
@@ -407,9 +407,9 @@ def gdb_stack(
         session.command(f"break {bp_addr}")
 
     if stdin_data:
-        session.run_with_stdin(stdin_data.encode("latin-1"), timeout=30)
+        session.run_with_stdin(stdin_data.encode("latin-1"), timeout=15)
     elif break_at:
-        session.command("run", timeout=30)
+        session.command("run", timeout=15)
 
     rsp_output = session.command("p/x $rsp")
     stack_output = session.command(f"x/{count}gx $rsp")

@@ -64,7 +64,7 @@ class TestGDBBreakpoint:
 
             def run_with_stdin(self, stdin_data, timeout=None):
                 self.commands.append(f"run_with_stdin:{timeout}")
-                return "[TIMEOUT after 30s waiting for GDB prompt]"
+                return "[TIMEOUT after 15s waiting for GDB prompt]"
 
             def close(self):
                 self.closed = True
@@ -80,16 +80,16 @@ class TestGDBBreakpoint:
             stdin_data="AAAA",
         )
 
-        assert result["output"] == "[TIMEOUT after 30s waiting for GDB prompt]"
-        assert result["disassembly"] == "[TIMEOUT after 30s waiting for GDB prompt]"
-        assert result["stack_dump"] == "[TIMEOUT after 30s waiting for GDB prompt]"
+        assert result["output"] == "[TIMEOUT after 15s waiting for GDB prompt]"
+        assert result["disassembly"] == "[TIMEOUT after 15s waiting for GDB prompt]"
+        assert result["stack_dump"] == "[TIMEOUT after 15s waiting for GDB prompt]"
         assert result["registers"] == {}
         assert result["command_results"] == {}
         assert fake_session.closed is True
         assert fake_session.commands == [
             "start:/tmp/fake",
             "break main",
-            "run_with_stdin:30",
+            "run_with_stdin:15",
         ]
 
 

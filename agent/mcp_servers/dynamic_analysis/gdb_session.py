@@ -61,7 +61,7 @@ def compact_gdb_transcript(text: str, max_chars: int = 2000) -> str:
 class GDBSession:
     """Manages a persistent GDB process via a PTY."""
 
-    def __init__(self, timeout: int = 30):
+    def __init__(self, timeout: int = 15):
         self.timeout = timeout
         self._proc: pexpect.spawn | None = None
         self._binary: str | None = None

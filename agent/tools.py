@@ -363,7 +363,7 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
                 "binary_path": {"type": "string", "description": "Path to target binary (optional, set as BINARY env var)."},
                 "timeout": {
                     "type": "integer",
-                    "description": "Execution timeout in seconds. Default 30.",
+                    "description": "Execution timeout in seconds. Default 15.",
                 },
                 "save_script": {"type": "boolean", "description": "Set true to save the script under /exploits. Default false."},
             },
