@@ -210,6 +210,62 @@ def _bootstrap_function_symbol_scope(checksec_res: Any) -> str:
     return "all"
 
 
+def _merge_known_facts(existing: list[str], new: list[str], *, max_facts: int = 8) -> list[str]:
+    """Deduplicate while preserving recency and keeping the fact list short."""
+    merged: list[str] = []
+    for fact in [*existing, *new]:
+        if not fact or fact in merged:
+            continue
+        merged.append(fact)
+    if len(merged) > max_facts:
+        merged = merged[-max_facts:]
+    return merged
+
+
+def _known_facts_message(facts: list[str]) -> str:
+    """Render a compact, persistent summary of settled findings."""
+    if not facts:
+        return (
+            "Known facts summary: none locked in yet. When a tool establishes a useful fact, "
+            "it will be summarized here so you can reuse it instead of re-deriving it."
+        )
+    lines = ["Known facts summary. Reuse these before broad recon:"]
+    for fact in facts:
+        lines.append(f"- {fact}")
+    return "\n".join(lines)
+
+
+_KNOWN_FACTS_BLOCK_RE = re.compile(
+    r"<known_facts>\s*(?P<body>.*?)\s*</known_facts>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _normalize_known_fact(raw: str) -> str:
+    fact = re.sub(r"\s+", " ", str(raw or "")).strip()
+    fact = re.sub(r"^[-*]\s*", "", fact)
+    if len(fact) > 240:
+        fact = fact[:237].rstrip() + "..."
+    return fact
+
+
+def _extract_known_facts_block(text: str) -> tuple[str, list[str] | None]:
+    """Strip an optional known-facts block from assistant text and parse its facts."""
+    match = _KNOWN_FACTS_BLOCK_RE.search(text)
+    if not match:
+        return text, None
+
+    body = match.group("body")
+    facts: list[str] = []
+    for line in body.splitlines():
+        fact = _normalize_known_fact(line)
+        if fact and fact not in facts:
+            facts.append(fact)
+
+    cleaned = (text[: match.start()] + text[match.end() :]).strip()
+    return cleaned, facts
+
+
 def _usage_add(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
     out = dict(a)
     for k, v in b.items():
@@ -311,12 +367,14 @@ class AutoPwnAgent:
         model: str = "claude-sonnet-4-20250514",
         max_iterations: int | None = None,
         api_key: str | None = None,
+        verbose: bool = False,
     ):
         self.model = model
         self.max_iterations = (
             max_iterations if max_iterations is not None else _default_max_iterations()
         )
         self.client = anthropic.Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
+        self.verbose = verbose
 
     def solve(
         self,
@@ -519,6 +577,10 @@ class AutoPwnAgent:
                     "but if bootstrap provides those values, reuse them. "
                     "If bootstrap includes `ghidra_decompile` with ok=true, treat that pseudocode "
                     "as primary source for control flow before writing exploits. "
+                    "If you want to refresh the known-facts summary, include a "
+                    "<known_facts>...</known_facts> block in your normal reply with one "
+                    "bullet-style fact per line. Only include settled, reusable facts; omit the "
+                    "block when nothing needs updating. "
                     "On static binaries, avoid broad "
                     "`elf_symbols(symbol_type='all', symbol_scope='all')` unless you need "
                     "runtime/libc/compiler symbols for a specific reason; prefer the default "
@@ -548,7 +610,16 @@ class AutoPwnAgent:
             }
         )
 
-        head_messages = 3 if user_context else 2
+        known_facts: list[str] = []
+        messages.append(
+            {
+                "role": "user",
+                "content": _known_facts_message(known_facts),
+            }
+        )
+        known_facts_index = len(messages) - 1
+
+        head_messages = 4 if user_context else 3
 
         all_tool_calls: list[dict] = []
         planner_injected = False
@@ -596,8 +667,27 @@ class AutoPwnAgent:
 
             for block in assistant_content:
                 if block.type == "text":
-                    clean = _sanitize_agent_text(block.text)
-                    console.print(Panel(clean, title="Agent", border_style="green"))
+                    clean, proposed_known_facts = _extract_known_facts_block(block.text)
+                    clean = _sanitize_agent_text(clean)
+                    if proposed_known_facts is not None:
+                        prev_known_facts = list(known_facts)
+                        known_facts = proposed_known_facts[:]
+                        messages[known_facts_index]["content"] = _known_facts_message(known_facts)
+                        if self.verbose:
+                            added_facts = [
+                                fact for fact in known_facts if fact not in prev_known_facts
+                            ]
+                            removed_facts = [
+                                fact for fact in prev_known_facts if fact not in known_facts
+                            ]
+                            if added_facts:
+                                self._display_known_facts(added_facts)
+                            if removed_facts:
+                                self._display_known_facts(
+                                    [f"Removed: {fact}" for fact in removed_facts]
+                                )
+                    if clean.strip():
+                        console.print(Panel(clean, title="Agent", border_style="green"))
                 elif block.type == "tool_use":
                     tool_use_blocks.append(block)
 
@@ -613,13 +703,14 @@ class AutoPwnAgent:
                         last_script = tc["input"].get("script")
                         break
 
-                console.print(
-                    Panel(
-                        _format_usage_summary(total_usage),
-                        title="Tokens/Cache",
-                        border_style="blue",
+                if self.verbose:
+                    console.print(
+                        Panel(
+                            _format_usage_summary(total_usage),
+                            title="Tokens/Cache",
+                            border_style="blue",
+                        )
                     )
-                )
                 return AgentResult(
                     success=True,
                     summary=summary,
@@ -704,13 +795,14 @@ class AutoPwnAgent:
             if response.stop_reason == "end_turn" and tool_use_blocks:
                 continue
 
-        console.print(
-            Panel(
-                _format_usage_summary(total_usage),
-                title="Tokens/Cache",
-                border_style="blue",
+        if self.verbose:
+            console.print(
+                Panel(
+                    _format_usage_summary(total_usage),
+                    title="Tokens/Cache",
+                    border_style="blue",
+                )
             )
-        )
         return AgentResult(
             success=False,
             summary="Max iterations reached without solving the challenge.",
@@ -728,6 +820,10 @@ class AutoPwnAgent:
                 val_str = val_str[:200] + "..."
             table.add_row(k, val_str)
         console.print(table)
+
+    def _display_known_facts(self, facts: list[str]) -> None:
+        body = "\n".join(f"- {fact}" for fact in facts)
+        console.print(Panel(body, title="Known Facts", border_style="magenta"))
 
     def _display_tool_result(self, name: str, result: Any, elapsed: float) -> None:
         result_str = (
