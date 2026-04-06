@@ -243,6 +243,15 @@ def _parse_c_int_literal(raw: str) -> int | None:
         return None
 
 
+def _extract_called_functions(code: str) -> list[str]:
+    names = re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*\);", code)
+    seen: list[str] = []
+    for name in names:
+        if name not in seen:
+            seen.append(name)
+    return seen
+
+
 def _extract_known_facts(tool_name: str, tool_input: dict[str, Any], result: Any) -> list[str]:
     """Pull out small, reusable conclusions from tool results."""
     facts: list[str] = []
@@ -272,19 +281,16 @@ def _extract_known_facts(tool_name: str, tool_input: dict[str, Any], result: Any
                         "instruction before treating it as a named function."
                     )
 
-                if func_name == "game" and all(
-                    call in code
-                    for call in (
-                        "mallic();",
-                        "freee();",
-                        "monkey_see();",
-                        "monkey_do();",
-                        "monkey_swaperoo();",
-                    )
+                called_functions = _extract_called_functions(code)
+                if (
+                    "switch(" in code
+                    and len(called_functions) >= 3
+                    and ("case " in code or "default:" in code)
                 ):
                     facts.append(
-                        "`game` is the menu dispatcher for `mallic`, `freee`, `monkey_see`, "
-                        "`monkey_do`, and `monkey_swaperoo`."
+                        f"`{func_name}` appears to dispatch control flow across: "
+                        + ", ".join(f"`{name}`" for name in called_functions[:5])
+                        + "."
                     )
 
                 buf_match = re.search(r"char\s+([A-Za-z0-9_]+)\s*\[(\d+)\];", code)
@@ -303,14 +309,13 @@ def _extract_known_facts(tool_name: str, tool_input: dict[str, Any], result: Any
                         )
 
                 if (
-                    func_name == "monkey_see"
-                    and "scanf" in code
-                    and "That monkey holds this: 0x%016lx" in code
-                    and "alStack_28" in code
+                    ("scanf" in code or "fgets" in code or "read(" in code)
+                    and "0x%016l" in code
+                    and ("alStack_" in code or "local_" in code)
                 ):
                     facts.append(
-                        "`monkey_see` prints stack-looking data from a stack array under "
-                        "user-controlled indexing; likely leak primitive."
+                        f"`{func_name}` prints stack-looking data from local storage under "
+                        "user-driven input; likely leak primitive."
                     )
 
     if tool_name == "run_exploit" and isinstance(result, dict):
@@ -327,7 +332,7 @@ def _extract_known_facts(tool_name: str, tool_input: dict[str, Any], result: Any
                 "scripts with `sendlineafter`/`sendafter`."
             )
         if "That monkey holds this: 0x" in stdout:
-            facts.append("Interactive testing confirmed `monkey_see` leaks stack-looking values.")
+            facts.append("Interactive testing confirmed a menu path leaks stack-looking values.")
         if "Pattern '/bin/sh' not found in binary" in combined:
             facts.append(
                 "`/bin/sh` is not present in the binary; plan to write it or use another path."

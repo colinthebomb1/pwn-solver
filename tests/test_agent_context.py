@@ -140,8 +140,10 @@ def test_extract_known_facts_from_ghidra_decompile() -> None:
             "main": {"c": "undefined8 main(void) { game(); syscall(); return 0; }"},
             "game": {
                 "c": (
-                    "void game(void) { mallic(); freee(); monkey_see(); monkey_do(); "
-                    "monkey_swaperoo(); }"
+                    "void game(void) { switch(local_14) { case 1: mallic(); break; "
+                    "case 2: freee(); break; case 3: monkey_see(); break; "
+                    "case 4: monkey_do(); break; default: "
+                    "monkey_swaperoo(); break; } }"
                 )
             },
             "monkey_do": {
@@ -161,7 +163,7 @@ def test_extract_known_facts_from_ghidra_decompile() -> None:
 
     facts = _extract_known_facts("ghidra_decompile", {}, result)
     assert any("raw syscall instruction" in fact for fact in facts)
-    assert any("menu dispatcher" in fact for fact in facts)
+    assert any("dispatch control flow" in fact for fact in facts)
     assert any("overflow primitive" in fact for fact in facts)
     assert any("leak primitive" in fact for fact in facts)
 
