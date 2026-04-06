@@ -12,6 +12,8 @@
 - When `rop_write_string_and_call_payload` returns a working chain shape, trust its default writable address unless tool output gives a stronger named target.
 - On menu-driven or multi-prompt binaries, the **first** `run_exploit` attempt must be a prompt-synchronization harness, not a full exploit. Prove that you can reach the vulnerable path cleanly before sending cyclic patterns, brute-force loops, or final payloads.
 - If a menu-sync script times out, do not keep escalating to larger exploit scripts. Fix the interaction model first.
+- During menu-sync debugging, print explicit checkpoints before and after each receive/send step. Prefer `print("checkpoint: ...")` plus `repr(received_bytes)` so the transcript shows exactly where progress stopped.
+- Use `context.log_level = 'debug'` only for short harness scripts when you need extra tube visibility. Once prompt sync is proven, turn it back down to `error` or omit it.
 
 ## Success Criteria
 
@@ -37,6 +39,7 @@ Write self-contained pwntools scripts. Always:
 - **Leaking `puts@got`:** after a stable marker (e.g. **`recvuntil(b'bye\\n')`**), read **6 bytes** with **`recvn(6)`** or **`recv(6)`** then **`u64(...ljust(8, b'\\x00'))`** — avoid assuming the leak is alone on one **`recvline()`** (ASCII/noise can produce bogus "addresses").
 - **Line-based sync:** prefer **`recvuntil(b'name?\\n')`**, **`recvuntil(b'bye\\n')`**, etc., so you do not stall on a partial delimiter.
 - **Menu harness first:** for menu binaries, start with helpers like `sendlineafter(menu_prompt, choice)` and small wrappers per action. The first validation script should only navigate prompts and confirm reachability of the target function.
+- **Checkpoint your harness:** print `checkpoint:` markers before waits and after successful receives/sends. When inspecting prompt text, print `repr(data)` or `repr(data[-80:])`, not pretty-decoded strings.
 - Print the flag or key output explicitly with `print()`.
 - Handle the case where the process crashes (catch and print the crash info).
 - For x86_64: remember stack alignment — if a call to system/puts/etc segfaults, add a `ret` gadget before the function address to align the stack to 16 bytes.

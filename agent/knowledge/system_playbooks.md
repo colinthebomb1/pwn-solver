@@ -113,17 +113,25 @@ For any menu-driven target, start with a tiny harness before exploit logic:
 
 ```python
 p = process(binary_path)
-p.recvuntil(b'>> ')
+print("checkpoint: spawned")
+menu = p.recvuntil(b'>> ')
+print("checkpoint: saw menu", repr(menu[-80:]))
 
 def choose(n):
+    print(f"checkpoint: choosing {n}")
     p.sendlineafter(b'>> ', str(n).encode())
+    print(f"checkpoint: chose {n}")
 
 def choose_and_send(n, prompt, data, *, line=True):
     choose(n)
     if line:
+        print("checkpoint: waiting for", repr(prompt))
         p.sendlineafter(prompt, data)
+        print("checkpoint: sent line", repr(data))
     else:
+        print("checkpoint: waiting for", repr(prompt))
         p.sendafter(prompt, data)
+        print("checkpoint: sent raw", repr(data))
 ```
 
 Use the **first** `run_exploit` attempt only to prove:
@@ -135,6 +143,13 @@ Use the **first** `run_exploit` attempt only to prove:
 - the program returns to the menu or exits as expected
 
 Do **not** mix this first harness with cyclic patterns, brute-force loops, or a full ROP chain.
+
+If that first harness still times out:
+
+- add one checkpoint per wait/send pair and inspect which checkpoint was last printed
+- print `repr()` of the exact bytes received around the prompt instead of decoded text
+- temporarily use `context.log_level = 'debug'` for that tiny harness only
+- keep the script small enough that the transcript stays readable
 
 When binaries mix `scanf("%d", ...)` for menu choices with raw `read()` for edit/write:
 
