@@ -135,7 +135,12 @@ def test_extract_known_facts_block_parses_and_strips_markup() -> None:
     from agent.core import _extract_known_facts_block
 
     text, facts = _extract_known_facts_block(
-        "We have enough to continue.\n<known_facts>\n- Canary abort observed\n- PIE is off\n</known_facts>\nNext step: inspect win."
+        "We have enough to continue.\n"
+        "<known_facts>\n"
+        "- Canary abort observed\n"
+        "- PIE is off\n"
+        "</known_facts>\n"
+        "Next step: inspect win."
     )
 
     assert "known_facts" not in text

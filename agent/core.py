@@ -674,7 +674,9 @@ class AutoPwnAgent:
                         known_facts = proposed_known_facts[:]
                         messages[known_facts_index]["content"] = _known_facts_message(known_facts)
                         if self.verbose:
-                            added_facts = [fact for fact in known_facts if fact not in prev_known_facts]
+                            added_facts = [
+                                fact for fact in known_facts if fact not in prev_known_facts
+                            ]
                             removed_facts = [
                                 fact for fact in prev_known_facts if fact not in known_facts
                             ]
