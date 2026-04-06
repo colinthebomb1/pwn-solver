@@ -56,6 +56,8 @@ Use the agent’s **`checksec`** first; confirm with **`elf_symbols`** (PLT/GOT)
 
 - **`ROP(elf)` / `ROP(libc)`** in pwntools: `rop.call(...)`, `rop.chain()`, **`rop.execve(path,0,0)`** after setting `libc.address`.
 - **Leak loop:** e.g. overflow once → **`pop rdi; got[puts]; puts_plt; main`** → parse leak → set **`libc.address`** → second stage ROP to **`system("/bin/sh")`**.
+- If `system@plt` exists but **`/bin/sh` does not**, write the string into `.bss` first via
+  **`gets`** / **`read`** in the chain, then pivot to **`system(writable_addr)`**.
 - **Mid-function entry:** jumping into the middle of a function may skip prologue; you may need an extra **dummy pop / saved RBP** slot at the end of the chain to satisfy epilogue of the wrong entry point.
 
 ## Canary leak (common pattern)

@@ -38,7 +38,10 @@ No win function, but `system()` is in PLT or libc. Build a ROP chain to call `sy
 6. Stage 2:
    - `ret2libc_stage2_payload` to call `system("/bin/sh")` with computed libc base.
    - Keep a `ret` for stack alignment on amd64 before `system`.
-7. Validate shell robustly (`id` -> `uid=`), not just process non-crash.
+7. If the binary has `system@plt` but no `/bin/sh` string, use
+   `rop_write_string_and_call_payload` to stage `/bin/sh` into writable memory
+   with `gets`/`read`, then call `system(writable_addr)`.
+8. Validate shell robustly (`id` -> `uid=`), not just process non-crash.
    - Send `id` then collect with `recvrepeat(timeout)` (or multiple recv attempts), because first read can be `b'\\n'` or banner text.
    - Treat `uid=` anywhere in collected bytes as success.
 
