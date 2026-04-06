@@ -18,6 +18,7 @@ TOOL_MODULE_MAP: dict[str, str] = {
     "pie_base_from_leak": "exploit",
     "ret2libc_stage1_payload": "exploit",
     "ret2libc_stage2_payload": "exploit",
+    "rop_write_string_and_call_payload": "exploit",
     "format_string_payload": "exploit",
     "ghidra_decompile": "exploit",
     "run_exploit": "exploit",
@@ -43,14 +44,14 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         },
     },
     "elf_symbols": {
-        "description": "List symbols from an ELF binary: functions, PLT, GOT, and sections. On static binaries, prefer the default auto/user-focused scope unless you truly need runtime noise.",
+        "description": "List symbols from an ELF binary: functions, PLT, GOT, named objects/globals, and sections. On static binaries, prefer the default auto/user-focused scope unless you truly need runtime noise.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "binary_path": {"type": "string", "description": "Path to the ELF binary"},
                 "symbol_type": {
                     "type": "string",
-                    "enum": ["all", "functions", "plt", "got"],
+                    "enum": ["all", "functions", "plt", "got", "objects"],
                     "description": "Type of symbols to list. Defaults to 'all'.",
                 },
                 "symbol_scope": {
@@ -82,16 +83,16 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         },
     },
     "rop_gadgets": {
-        "description": "Search for ROP gadgets in a binary. Uses pwntools ROP engine plus raw byte-pattern search for common gadgets.",
+        "description": "Search for ROP gadgets in a binary. With no `search`, returns a curated common gadget pack first so you usually do not need multiple narrow gadget calls.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "binary_path": {"type": "string", "description": "Path to the ELF binary"},
                 "search": {
                     "type": "string",
-                    "description": "Filter string (e.g. 'pop rdi', 'ret'). If omitted, returns all gadgets.",
+                    "description": "Optional filter string (e.g. 'pop rdi', 'ret'). If omitted, returns the common gadget pack.",
                 },
-                "max_results": {"type": "integer", "description": "Max gadgets to return. Default 50."},
+                "max_results": {"type": "integer", "description": "Max gadgets to return. Default 128."},
             },
             "required": ["binary_path"],
         },
@@ -230,6 +231,54 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
                 "saved_rbp": {"type": "string", "description": "Optional saved RBP value to place after canary. Default 0x0."},
             },
             "required": ["binary_path", "libc_path", "offset", "leaked_symbol", "leaked_address"],
+        },
+    },
+    "rop_write_string_and_call_payload": {
+        "description": (
+            "Build a ROP payload that first writes attacker-controlled bytes into writable memory "
+            "with gets/read, then calls a function like system() on that address. Useful when "
+            "the binary has system@plt but no '/bin/sh' string in memory. Trust the helper's "
+            "default writable address unless you have evidence that a different target is safer."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "binary_path": {"type": "string", "description": "Target ELF path."},
+                "offset": {"type": "integer", "description": "Overflow offset to saved RIP."},
+                "string_data": {
+                    "type": "string",
+                    "description": "Bytes to stage into writable memory. Defaults to '/bin/sh'.",
+                },
+                "call_symbol": {
+                    "type": "string",
+                    "description": "Function to call after writing the string. Defaults to system.",
+                },
+                "writer_symbol": {
+                    "type": "string",
+                    "description": "Writer function to use, usually gets or read. Defaults to auto.",
+                },
+                "writable_address": {
+                    "type": "string",
+                    "description": "Optional writable target address as hex/int string. Defaults to .bss + 0x80.",
+                },
+                "pie_base": {
+                    "type": "string",
+                    "description": "Optional PIE base as hex/int string. If omitted, treated as 0.",
+                },
+                "canary": {
+                    "type": "string",
+                    "description": "Optional leaked stack canary as hex/int string.",
+                },
+                "canary_offset": {
+                    "type": "integer",
+                    "description": "Byte offset from input start to canary slot (required if canary is provided).",
+                },
+                "saved_rbp": {
+                    "type": "string",
+                    "description": "Optional saved RBP value to place after canary. Default 0x0.",
+                },
+            },
+            "required": ["binary_path", "offset"],
         },
     },
     "ghidra_decompile": {

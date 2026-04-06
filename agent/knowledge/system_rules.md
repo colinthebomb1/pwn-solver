@@ -8,6 +8,8 @@
 - If an exploit fails, analyze WHY before retrying with changes.
 - Limit exploit attempts to 5 retries with meaningful changes between each.
 - ALWAYS use `gdb_find_offset` for buffer overflow offset instead of guessing.
+- For ROP, prefer `rop_gadgets(binary_path)` with no `search` first; do not spend multiple tool calls rediscovering common gadgets unless the default pack is missing something specific.
+- When `rop_write_string_and_call_payload` returns a working chain shape, trust its default writable address unless tool output gives a stronger named target.
 
 ## Success Criteria
 
