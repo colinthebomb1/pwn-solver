@@ -21,3 +21,17 @@ def test_caps_at_max_funcs():
 
 def test_empty_funcs_falls_back_to_main():
     assert _bootstrap_ghidra_function_names({}, 12) == ["main"]
+
+
+def test_static_like_function_list_prefers_real_targets():
+    fa = {
+        "main": "0x401000",
+        "vulnerable": "0x401100",
+        "_IO_fputs": "0x500000",
+        "malloc": "0x500100",
+        "strtol": "0x500200",
+        "pthread_once": "0x500300",
+        "dlopen": "0x500400",
+    }
+    n = _bootstrap_ghidra_function_names(fa, 12)
+    assert n == ["main", "vulnerable"]
