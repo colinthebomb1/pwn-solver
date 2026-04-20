@@ -60,7 +60,20 @@ def _bootstrap_ghidra_function_names(func_addrs: dict[str, Any], max_funcs: int)
     for name in ("main", "vuln", "win", "pwn"):
         if name in keys and name not in priority:
             priority.append(name)
+    for name in keys:
+        lowered = name.lower()
+        if lowered == "vulnerable" and name not in priority:
+            priority.append(name)
     fixed_skip = frozenset({"_init", "_fini", "_start", "start"})
+    static_hint_parts = ("vuln", "vulner", "win", "pwn", "flag", "shell", "secret", "admin")
+    library_heavy = any(
+        k.startswith(("_", "dl", "pthread_"))
+        or any(
+            part in k.lower()
+            for part in ("printf", "scanf", "malloc", "free", "locale", "unwind")
+        )
+        for k in keys
+    )
     rest: list[str] = []
     for k in sorted(keys):
         if k in priority or k in fixed_skip:
@@ -68,6 +81,8 @@ def _bootstrap_ghidra_function_names(func_addrs: dict[str, Any], max_funcs: int)
         if k.startswith("__"):
             continue
         if k.startswith("register_tm") or k.startswith("deregister"):
+            continue
+        if library_heavy and not any(part in k.lower() for part in static_hint_parts):
             continue
         rest.append(k)
     out = priority + rest

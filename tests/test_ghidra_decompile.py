@@ -219,6 +219,45 @@ def test_run_ghidra_decompile_merges_partial_function_cache(monkeypatch, tmp_pat
     assert "-process" in seen["cmd"]
 
 
+def test_run_ghidra_decompile_filters_static_cache_noise(monkeypatch, tmp_path):
+    binary = tmp_path / "sample.bin"
+    binary.write_bytes(b"hello")
+    digest = "abcd1234ef567890"
+    proj_dir = tmp_path / "cache" / digest
+    proj_dir.mkdir(parents=True)
+    (proj_dir / f"autopwn_sample.bin_{digest}.gpr").write_text("", encoding="utf-8")
+    (proj_dir / f"autopwn_sample.bin_{digest}.rep").mkdir()
+    (proj_dir / "function_decomp_cache.json").write_text(
+        '{"main":{"c":"int main(void){return 0;}"},"malloc":{"c":"void *malloc(...)"}}',
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(ghidra_decompile, "_ghidra_home_from_env", lambda: "/opt/ghidra")
+    monkeypatch.setattr(
+        ghidra_decompile,
+        "_analyze_headless_path",
+        lambda home: "/opt/ghidra/support/analyzeHeadless",
+    )
+    monkeypatch.setattr(ghidra_decompile, "_hash_file", lambda path: digest)
+    monkeypatch.setattr(ghidra_decompile, "_ghidra_cache_root", lambda: str(tmp_path / "cache"))
+    monkeypatch.setattr(ghidra_decompile, "_env_for_ghidra", lambda: {})
+    monkeypatch.setattr(ghidra_decompile, "_is_static_binary", lambda path: True)
+
+    def fail_run(*args, **kwargs):
+        raise AssertionError(
+            "subprocess.run should not be called when the remaining static function is cached"
+        )
+
+    monkeypatch.setattr(ghidra_decompile.subprocess, "run", fail_run)
+
+    result = run_ghidra_decompile(str(binary), ["main", "malloc"])
+    assert result["ok"] is True
+    assert list(result["functions"]) == ["main"]
+    assert result["cache"]["function_hit_count"] == 1
+    assert result["cache"]["function_hits"] == ["main"]
+    assert result["cache"]["filtered_out"] == ["malloc"]
+
+
 def _ghidra_headless_available() -> bool:
     for key in ("GHIDRA_HOME", "PWN_GHIDRA_HOME"):
         gh = os.environ.get(key)
