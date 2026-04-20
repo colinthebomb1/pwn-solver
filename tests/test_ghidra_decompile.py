@@ -244,7 +244,9 @@ def test_run_ghidra_decompile_filters_static_cache_noise(monkeypatch, tmp_path):
     monkeypatch.setattr(ghidra_decompile, "_is_static_binary", lambda path: True)
 
     def fail_run(*args, **kwargs):
-        raise AssertionError("subprocess.run should not be called when the remaining static function is cached")
+        raise AssertionError(
+            "subprocess.run should not be called when the remaining static function is cached"
+        )
 
     monkeypatch.setattr(ghidra_decompile.subprocess, "run", fail_run)
 

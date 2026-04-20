@@ -68,7 +68,10 @@ def _bootstrap_ghidra_function_names(func_addrs: dict[str, Any], max_funcs: int)
     static_hint_parts = ("vuln", "vulner", "win", "pwn", "flag", "shell", "secret", "admin")
     library_heavy = any(
         k.startswith(("_", "dl", "pthread_"))
-        or any(part in k.lower() for part in ("printf", "scanf", "malloc", "free", "locale", "unwind"))
+        or any(
+            part in k.lower()
+            for part in ("printf", "scanf", "malloc", "free", "locale", "unwind")
+        )
         for k in keys
     )
     rest: list[str] = []
